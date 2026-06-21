@@ -201,6 +201,27 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
 .club-bar-wrap{flex:1;height:6px;background:var(--border-lt);border-radius:3px;overflow:hidden}
 .club-bar-fill{height:100%;border-radius:3px}
 .club-n{font-size:11px;color:var(--text-3);width:28px;text-align:right}
+/* PROFILE */
+.profile-hero{background:linear-gradient(135deg,#2D2D2D 0%,#1A1A18 100%);padding:calc(var(--safe-top)+32px) 20px 28px;color:#fff;text-align:center}
+.profile-avatar{width:72px;height:72px;border-radius:50%;background:var(--green);display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 12px}
+.profile-name{font-size:22px;font-weight:700;letter-spacing:-0.03em}
+.profile-sub{font-size:13px;opacity:0.65;margin-top:4px}
+.club-setting-row{display:flex;flex-direction:column;padding:10px 0;border-bottom:0.5px solid var(--border-lt)}
+.club-setting-row:last-child{border-bottom:none}
+.club-setting-name{font-size:14px;font-weight:500;width:48px;flex-shrink:0;color:var(--text)}
+.club-setting-inputs{flex:1;display:flex;gap:8px;align-items:center}
+.club-input{flex:1;border:0.5px solid var(--border);border-radius:8px;padding:7px 10px;font-size:13px;font-family:inherit;color:var(--text);background:var(--bg);outline:none;min-width:0}
+.club-input:focus{border-color:var(--green)}
+.club-input-unit{font-size:11px;color:var(--text-3);flex-shrink:0}
+.toggle-row{display:flex;align-items:center;padding:14px 0;border-bottom:0.5px solid var(--border-lt)}
+.toggle-row:last-child{border-bottom:none}
+.toggle-lbl{font-size:15px;flex:1}
+.toggle-sub{font-size:12px;color:var(--text-2);margin-top:2px}
+.chip-sel-group{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.chip-sel{padding:6px 12px;border:0.5px solid var(--border);border-radius:20px;font-size:13px;cursor:pointer;background:none;color:var(--text-2);font-family:inherit;transition:all 0.15s}
+.chip-sel.active{background:var(--green);border-color:var(--green);color:#fff;font-weight:500}
+.profile-input{width:100%;border:0.5px solid var(--border);border-radius:10px;padding:11px 14px;font-size:15px;font-family:inherit;color:var(--text);background:var(--bg);outline:none}
+.profile-input:focus{border-color:var(--green)}
 /* DRUM */
 .drum-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
 .drum-overlay.open{display:flex}
@@ -259,7 +280,10 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
   </div>
   <div class="home-body">
     <button class="btn btn-primary" onclick="goTo('s1')">+ 新しいラウンドを開始</button>
-    <button class="btn btn-secondary" onclick="openAnalysis()" style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:6px">📊 スイング・スコア分析</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
+      <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="openAnalysis()">📊 スコア分析</button>
+      <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="goTo('s11')">⚙️ プロフィール</button>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
       <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="openShareModal()">📤 データを共有</button>
       <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="openImportModal()">📥 友達のデータ</button>
@@ -370,7 +394,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
   <div id="tp0" class="tab-pane active"><div class="sf-sec">
     <div class="sf-sec-lbl">番手</div>
     <div class="card">
-      <div class="fr" onclick="openDrum('番手',null,clubs,'sf-club')"><span class="fr-lbl">クラブ</span><span class="fr-val" id="sf-club-v">選択</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('番手',null,getActiveClubs(),'sf-club')"><span class="fr-lbl">クラブ</span><span class="fr-val" id="sf-club-v">選択</span><span class="fr-arr">›</span></div>
       <div class="fr" onclick="openDrum('ショット種類',null,shotTypes,'sf-stype')"><span class="fr-lbl">ショット種類</span><span class="fr-val set" id="sf-stype-v">フルショット</span><span class="fr-arr">›</span></div>
       <div class="fr" onclick="openDrum('意図した球筋',null,shotShapes,'sf-shape')"><span class="fr-lbl">意図した球筋</span><span class="fr-val set" id="sf-shape-v">ストレート</span><span class="fr-arr">›</span></div>
     </div>
@@ -563,6 +587,16 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <button class="modal-btn primary" id="cupin-next-btn" onclick="goNextHole()"></button>
     <button class="modal-btn secondary" onclick="closeCupinModal()">このホールに留まる</button>
   </div>
+</div>
+
+<!-- PROFILE -->
+<div id="s11" class="screen">
+  <div class="topbar">
+    <button class="nav-btn" onclick="goTo('s0')">← ホーム</button>
+    <div class="topbar-title">プロフィール設定</div>
+    <button class="nav-btn right" onclick="saveProfile()">保存</button>
+  </div>
+  <div class="content" id="profile-content"></div>
 </div>
 
 <!-- VIEWER (閲覧専用) -->
@@ -890,6 +924,7 @@ function goTo(id){
   if(id==='s3')renderHole();
   if(id==='s6'){renderHistoryList();}
   if(id==='s8')renderAnalysis();
+  if(id==='s11')renderProfilePage();
 }
 
 function fmtDate(d){return d.getFullYear()+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getDate().toString().padStart(2,'0');}
@@ -1479,6 +1514,7 @@ function renderAnalysis(){
   }
 
   // ===== 各種集計 =====
+  const prof=loadProfile()||{};
   const totalRounds=rounds.filter(r=>r.holes&&r.holes.some(h=>h.shots&&h.shots.length)).length;
   const totalHoles=allHoles.length;
   const totalShots=allShots.length;
@@ -1728,6 +1764,56 @@ function renderAnalysis(){
     }
   }
 
+  // 9. プロフィール活用：持ち球と実際のミス方向の整合チェック
+  if(prof.ballFlight&&totalDir>=10){
+    const isDrawPlayer=prof.ballFlight==='draw'||prof.ballFlight==='hook';
+    const isFadePlayer=prof.ballFlight==='fade'||prof.ballFlight==='slice';
+    if(isDrawPlayer&&rightMiss>leftMiss*1.5){
+      insights.push({score:0.15,priority:'B',title:'持ち球と逆方向のミスが多い',body:`持ち球はドロー系ですが、ミスが右方向（${Math.round(rightMiss/(totalDir)*100)}%）に偏っています。スウィング軌道がアウトサイドインに変わっている可能性があります。`,point:'グリップとアドレスを確認。インサイドアウトの軌道に戻すドリルを行いましょう。'});
+    }else if(isFadePlayer&&leftMiss>rightMiss*1.5){
+      insights.push({score:0.15,priority:'B',title:'持ち球と逆方向のミスが多い',body:`持ち球はフェード系ですが、ミスが左方向（${Math.round(leftMiss/(totalDir)*100)}%）に偏っています。インサイドアウトになっている可能性があります。`,point:'フォロースルーで左肘が引けていないか確認。フィニッシュを高く保つ意識を。'});
+    }
+  }
+
+  // 10. プロフィール活用：自己申告の弱点とデータの整合
+  if(prof.weaknesses&&prof.weaknesses.length){
+    if(prof.weaknesses.includes('バンカー')&&bunkerShot&&bunkerShot.n>=3){
+      const rate=Math.round(bunkerShot.miss/bunkerShot.n*100);
+      insights.push({score:rate*0.02,priority:rate>=50?'A':'B',title:'バンカー（自覚あり・データ確認）',body:`自己申告通り、バンカーミス率${rate}%（${bunkerShot.n}回中${bunkerShot.miss}回）が確認されました。`,point:'フェースを開いてボールの手前の砂を薄く取る練習を。スタンスは広く、体重は左足多め。'});
+    }
+    if(prof.weaknesses.includes('プレッシャー下')){
+      const mentalPressure=allShots.filter(s=>s.mental&&s.mental.includes('プレッシャー')).length;
+      if(mentalPressure>=3)insights.push({score:0.1,priority:'B',title:'プレッシャー下でのメンタル管理',body:`プレッシャーを感じた場面が${mentalPressure}回記録されています。自覚しているように精神面が課題です。`,point:'深呼吸3回＋ルーティン徹底。ショット前のルーティンを10秒以内に固定することで安定します。'});
+    }
+  }
+
+  // 11. プロフィール活用：目標スコアとの乖離
+  if(prof.goalScore&&totalRounds>=3){
+    const recentAvg=recentRounds.slice(-3).reduce((a,r)=>{let s=0;r.holes&&r.holes.forEach(h=>{if(h.shots&&h.shots.length)s+=h.shots.length;});return a+s;},0)/Math.min(3,recentRounds.length);
+    const gap=Math.round(recentAvg-parseInt(prof.goalScore));
+    if(gap>0){
+      insights.push({score:gap*0.05,priority:gap>=10?'A':gap>=5?'B':'C',title:`目標スコア${prof.goalScore}まであと${gap}打`,body:`直近3ラウンドの平均${Math.round(recentAvg)}打。目標の${prof.goalScore}まで${gap}打の差があります。`,point:gap>=10?'パットとティーショットの安定が最短ルート。1ホール1つのミスに絞って対策しましょう。':'もう少し！パーを1〜2個増やすだけで達成できます。ボギーオン＋2パットを徹底してください。'});
+    }else{
+      insights.push({score:0.1,priority:'C',title:`目標スコア${prof.goalScore}を達成中！`,body:`直近3ラウンドの平均${Math.round(recentAvg)}打で目標を${Math.abs(gap)}打上回っています。`,point:'次の目標を設定しましょう。バーディ数を増やすフェーズに入っています。'});
+    }
+  }
+
+  // 12. クラブのキャリーと実打距離の乖離（プロフィール設定済みクラブのみ）
+  if(prof.clubs){
+    prof.clubs.forEach(pc=>{
+      if(!pc.carry||!pc.name)return;
+      const clubName=pc.name;
+      const shots=allShots.filter(s=>s.club&&s.club===clubName&&s.hitdist&&s.hitdist>0);
+      if(shots.length<3)return;
+      const avgHit=Math.round(shots.reduce((a,s)=>a+s.hitdist,0)/shots.length);
+      const settingCarry=parseInt(pc.carry);
+      const diff=settingCarry-avgHit;
+      if(Math.abs(diff)>=15){
+        insights.push({score:Math.abs(diff)*0.01,priority:'B',title:`${pc.id}の設定キャリーと実打距離に誤差`,body:`設定キャリー${settingCarry}yに対し実際の平均${avgHit}y（${diff>0?'実際が'+diff+'y短い':'実際が'+Math.abs(diff)+'y長い'}）。クラブ設定を更新してください。`,point:diff>0?'番手選択で1番手大きめを選ぶか、プロフィールのキャリー設定を更新しましょう。':'プロフィールのキャリー設定を実測値に合わせて更新してください。'});
+      }
+    });
+  }
+
   // 重要度順にソート
   insights.sort((a,b)=>{
     const pr={'A':3,'B':2,'C':1};
@@ -1789,7 +1875,7 @@ function renderAnalysis(){
 
   el.innerHTML=`
     <div style="background:linear-gradient(135deg,var(--blue) 0%,#2272C3 100%);padding:18px 20px 22px;border-radius:14px;margin-bottom:14px;color:#fff">
-      <div style="font-size:12px;opacity:0.8;margin-bottom:10px;font-weight:500">${totalRounds}ラウンド / ${totalShots}打のデータ</div>
+      <div style="font-size:12px;opacity:0.8;margin-bottom:10px;font-weight:500">${prof.name?prof.name+'の':''}${totalRounds}ラウンド / ${totalShots}打のデータ${prof.goalScore?' · 目標'+prof.goalScore+'打':''}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div><div style="font-size:11px;opacity:0.75;margin-bottom:2px">フェアウェイキープ率</div><div style="font-size:26px;font-weight:700;letter-spacing:-0.04em">${firRate}%</div></div>
         <div><div style="font-size:11px;opacity:0.75;margin-bottom:2px">グリーンオン率</div><div style="font-size:26px;font-weight:700;letter-spacing:-0.04em">${girRate}%</div></div>
@@ -1975,6 +2061,194 @@ function exitViewer(){
   goTo('s0');
 }
 
+// ===== PROFILE =====
+const PROFILE_KEY='golf_profile_v1';
+const DEFAULT_CLUBS=[
+  {id:'1W', name:'1W（ドライバー）', carry:''},
+  {id:'3W', name:'3W', carry:''},
+  {id:'5W', name:'5W', carry:''},
+  {id:'UT', name:'UT（ユーティリティ）', carry:''},
+  {id:'5I', name:'5I', carry:''},
+  {id:'6I', name:'6I', carry:''},
+  {id:'7I', name:'7I', carry:''},
+  {id:'8I', name:'8I', carry:''},
+  {id:'9I', name:'9I', carry:''},
+  {id:'PW', name:'PW（Pウェッジ）', carry:''},
+  {id:'AW', name:'AW（Aウェッジ）', carry:''},
+  {id:'SW', name:'SW（Sウェッジ）', carry:''},
+  {id:'LW', name:'LW（Lウェッジ）', carry:''},
+  {id:'PT', name:'パター', carry:''},
+];
+
+function loadProfile(){
+  try{return JSON.parse(localStorage.getItem(PROFILE_KEY)||'null');}catch(e){return null;}
+}
+function saveProfileData(p){
+  localStorage.setItem(PROFILE_KEY,JSON.stringify(p));
+}
+
+// クラブリストをプロフィール設定から生成（未設定ならデフォルト）
+function getClubList(){
+  const p=loadProfile();
+  if(p&&p.clubs&&p.clubs.length){
+    return p.clubs.filter(c=>c.use!==false).map(c=>c.name||c.id);
+  }
+  return DEFAULT_CLUBS.map(c=>c.name);
+}
+
+// プロフィール画面を描画
+function renderProfilePage(){
+  const p=loadProfile()||{};
+  const clubs=(p.clubs||DEFAULT_CLUBS).map(c=>({...c}));
+  // 足りないクラブをDEFAULTで補完
+  DEFAULT_CLUBS.forEach(dc=>{if(!clubs.find(c=>c.id===dc.id))clubs.push({...dc});});
+
+  const clubRows=clubs.map((c,i)=>`
+    <div class="club-setting-row">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${c.id}</div>
+        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);cursor:pointer">
+          <input type="checkbox" id="cu_${i}" ${c.use===false?'':'checked'} style="width:16px;height:16px;accent-color:var(--green)">使用する
+        </label>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <input class="club-input" placeholder="クラブ名" value="${c.name||''}" id="cn_${i}" style="flex:3;min-width:0">
+        <input class="club-input" placeholder="飛距離" value="${c.carry||''}" id="cc_${i}" style="flex:1;min-width:52px;max-width:72px;text-align:right" inputmode="numeric" type="number">
+        <span style="font-size:11px;color:var(--text-3);flex-shrink:0">y</span>
+      </div>
+    </div>`).join('');
+
+  document.getElementById('profile-content').innerHTML=`
+    <div style="background:linear-gradient(135deg,var(--green-dk) 0%,var(--green) 100%);padding:calc(var(--safe-top,0px) + 24px) 20px 24px;margin:-16px -16px 16px;color:#fff;text-align:center">
+      <div style="width:64px;height:64px;border-radius:50%;background:rgba(255,255,255,0.2);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 10px">🏌️</div>
+      <div style="font-size:20px;font-weight:700;letter-spacing:-0.03em">${p.name||'プレーヤー名を設定してください'}</div>
+      <div style="font-size:12px;opacity:0.75;margin-top:4px">${p.handicap?'HC '+p.handicap:''}${p.hand?' · '+(p.hand==='right'?'右利き':'左利き'):''}</div>
+    </div>
+
+    <div class="sec-lbl">基本情報</div>
+    <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">プレーヤー名</label>
+        <input class="profile-input" id="p-name" value="${p.name||''}" placeholder="例：中田はやと"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">利き手</label>
+        <div class="chip-sel-group">
+          <button class="chip-sel ${p.hand==='right'||!p.hand?'active':''}" onclick="selChipPro(this,'hand','right')">右利き</button>
+          <button class="chip-sel ${p.hand==='left'?'active':''}" onclick="selChipPro(this,'hand','left')">左利き</button>
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">ハンディキャップ</label>
+        <input class="profile-input" id="p-hcp" value="${p.handicap||''}" placeholder="例：18" inputmode="decimal" type="number" step="0.1"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">目標スコア（18H）</label>
+        <input class="profile-input" id="p-goal-score" value="${p.goalScore||''}" placeholder="例：90" inputmode="numeric" type="number"></div>
+    </div>
+
+    <div class="sec-lbl">スウィング情報</div>
+    <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">持ち球（自然に出る球筋）</label>
+        <div class="chip-sel-group">
+          <button class="chip-sel ${p.ballFlight==='draw'?'active':''}" onclick="selChipPro(this,'ball-flight','draw')">ドロー</button>
+          <button class="chip-sel ${p.ballFlight==='fade'?'active':''}" onclick="selChipPro(this,'ball-flight','fade')">フェード</button>
+          <button class="chip-sel ${p.ballFlight==='straight'?'active':''}" onclick="selChipPro(this,'ball-flight','straight')">ストレート</button>
+          <button class="chip-sel ${p.ballFlight==='hook'?'active':''}" onclick="selChipPro(this,'ball-flight','hook')">フック</button>
+          <button class="chip-sel ${p.ballFlight==='slice'?'active':''}" onclick="selChipPro(this,'ball-flight','slice')">スライス</button>
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">自覚している弱点</label>
+        <div class="chip-sel-group" id="weakness-chips">
+          ${['パット','アプローチ','バンカー','ドライバー','アイアン','傾斜地','プレッシャー下','風の影響','ショートホール','距離感'].map(w=>`<button class="chip-sel ${(p.weaknesses||[]).includes(w)?'active':''}" onclick="toggleWeakness(this,'${w}')">${w}</button>`).join('')}
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">ゴルフ歴</label>
+        <div class="chip-sel-group">
+          ${['1年未満','1〜3年','3〜5年','5〜10年','10年以上'].map(y=>`<button class="chip-sel ${p.golfHistory===y?'active':''}" onclick="selChipPro(this,'golf-history','${y}')">${y}</button>`).join('')}
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">月間ラウンド数</label>
+        <div class="chip-sel-group">
+          ${['月1以下','月2〜3','週1','週2以上'].map(r=>`<button class="chip-sel ${p.roundFreq===r?'active':''}" onclick="selChipPro(this,'round-freq','${r}')">${r}</button>`).join('')}
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">練習頻度</label>
+        <div class="chip-sel-group">
+          ${['ほぼしない','月数回','週1','週2以上'].map(r=>`<button class="chip-sel ${p.practiceFreq===r?'active':''}" onclick="selChipPro(this,'practice-freq','${r}')">${r}</button>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <div class="sec-lbl">クラブ設定（名前と平均キャリーを入力）</div>
+    <div style="font-size:12px;color:var(--text-2);padding:0 4px 8px;line-height:1.5">「使う」チェックを外すとそのクラブはショット入力に出てきません。キャリーを入れると分析に活用されます。</div>
+    <div class="card" style="padding:4px 16px">
+      ${clubRows}
+    </div>
+    <div style="height:calc(var(--safe-bot,0px)+24px)"></div>
+  `;
+  // chip選択状態を内部変数に保持
+  window._profileTemp={
+    hand:p.hand||'right',
+    ballFlight:p.ballFlight||'',
+    golfHistory:p.golfHistory||'',
+    roundFreq:p.roundFreq||'',
+    practiceFreq:p.practiceFreq||'',
+    weaknesses:[...(p.weaknesses||[])],
+    clubs:clubs
+  };
+}
+
+function selChipPro(el,group,val){
+  const parent=el.parentElement;
+  parent.querySelectorAll('.chip-sel').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  if(!window._profileTemp)window._profileTemp={};
+  const keyMap={'hand':'hand','ball-flight':'ballFlight','golf-history':'golfHistory','round-freq':'roundFreq','practice-freq':'practiceFreq'};
+  window._profileTemp[keyMap[group]]=val;
+}
+
+function toggleWeakness(el,val){
+  if(!window._profileTemp)window._profileTemp={weaknesses:[]};
+  if(!window._profileTemp.weaknesses)window._profileTemp.weaknesses=[];
+  const idx=window._profileTemp.weaknesses.indexOf(val);
+  if(idx>=0){window._profileTemp.weaknesses.splice(idx,1);el.classList.remove('active');}
+  else{window._profileTemp.weaknesses.push(val);el.classList.add('active');}
+}
+
+function saveProfile(){
+  const tmp=window._profileTemp||{};
+  const p=loadProfile()||{};
+  // 基本情報
+  p.name=document.getElementById('p-name')?.value||p.name||'';
+  p.handicap=document.getElementById('p-hcp')?.value||p.handicap||'';
+  p.goalScore=document.getElementById('p-goal-score')?.value||p.goalScore||'';
+  p.hand=tmp.hand||p.hand||'right';
+  p.ballFlight=tmp.ballFlight||p.ballFlight||'';
+  p.golfHistory=tmp.golfHistory||p.golfHistory||'';
+  p.roundFreq=tmp.roundFreq||p.roundFreq||'';
+  p.practiceFreq=tmp.practiceFreq||p.practiceFreq||'';
+  p.weaknesses=tmp.weaknesses||p.weaknesses||[];
+  // クラブ設定
+  const clubs=(tmp.clubs||DEFAULT_CLUBS).map((c,i)=>({
+    id:c.id,
+    name:document.getElementById('cn_'+i)?.value||c.name||c.id,
+    carry:document.getElementById('cc_'+i)?.value||c.carry||'',
+    use:document.getElementById('cu_'+i)?.checked!==false
+  }));
+  p.clubs=clubs;
+  saveProfileData(p);
+  // clubsグローバルを更新
+  updateClubsFromProfile();
+  goTo('s0');
+}
+
+function updateClubsFromProfile(){
+  // グローバルのclubs配列をプロフィール設定で上書き
+  const list=getClubList();
+  // clubs定数は再代入できないのでwindow._customClubsに保存
+  window._customClubs=list;
+}
+
+// ショット入力でクラブドラムを開く際にプロフィール反映済みリストを使う
+function getActiveClubs(){
+  return window._customClubs||getClubList();
+}
+
 // SERVICE WORKER
 if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});}
 
@@ -1983,6 +2257,7 @@ R.date=fmtDate(new Date());
 const dateEl=document.getElementById('r-date-v');if(dateEl)dateEl.textContent=R.date;
 DV['r-side']='OUT（1番スタート）';DV['r-hcp']='0';DV['r-weather']='晴れ';
 initHoles();
+updateClubsFromProfile(); // プロフィールのクラブ設定を反映
 </script>
 </body>
 </html>
