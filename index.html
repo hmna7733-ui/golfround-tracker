@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ゴルフ記録">
+<meta name="theme-color" content="#0F6E56">
+<title>ゴルフラウンド記録</title>
+<link rel="manifest" href="manifest.json">
+<style>
+:root{
+  --green:#1D9E75;--green-dk:#0F6E56;--green-lt:#E1F5EE;
+  --blue:#185FA5;--blue-lt:#E6F1FB;
+  --amber:#BA7517;--amber-lt:#FAEEDA;
+  --red:#E24B4A;--red-lt:#FCEBEB;
+  --bg:#F7F7F5;--card:#FFFFFF;
+  --border:#E4E2DC;--border-lt:#F0EEE8;
+  --text:#1A1A18;--text-2:#6B6960;--text-3:#A8A59C;
+  --safe-top:env(safe-area-inset-top,0px);
+  --safe-bot:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
+html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Hiragino Sans','Hiragino Kaku Gothic ProN','Noto Sans JP',sans-serif;color:var(--text);font-size:16px;overscroll-behavior:none}
+.app{max-width:430px;margin:0 auto;min-height:100%;position:relative;background:var(--bg)}
+
+/* ===== SCREEN ===== */
+.screen{display:none;position:absolute;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.screen.active{display:block}
+
+/* ===== TOPBAR ===== */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  display:flex;align-items:center;gap:10px;
+  padding:calc(var(--safe-top) + 10px) 16px 10px;
+  background:rgba(247,247,245,0.92);
+  backdrop-filter:saturate(180%) blur(12px);
+  -webkit-backdrop-filter:saturate(180%) blur(12px);
+  border-bottom:0.5px solid var(--border);
+}
+.topbar-title{font-size:17px;font-weight:600;flex:1;letter-spacing:-0.02em}
+.topbar-sub{font-size:11px;color:var(--text-2);flex:1}
+.nav-btn{background:none;border:none;font-size:15px;color:var(--green);cursor:pointer;padding:6px 0;font-weight:500;white-space:nowrap;min-width:44px}
+.nav-btn.right{text-align:right}
+
+/* ===== CONTENT ===== */
+.content{padding:16px 16px calc(var(--safe-bot) + 24px)}
+
+/* ===== SECTION LABEL ===== */
+.sec-lbl{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.08em;margin:20px 0 6px;padding:0 4px}
+.sec-lbl:first-child{margin-top:0}
+
+/* ===== CARD ===== */
+.card{background:var(--card);border:0.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+
+/* ===== FIELD ROW ===== */
+.fr{display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border-lt);min-height:54px;cursor:pointer;transition:background 0.1s}
+.fr:last-child{border-bottom:none}
+.fr:active{background:#F0EEE8}
+.fr.no-tap{cursor:default}.fr.no-tap:active{background:none}
+.fr-lbl{font-size:15px;flex:1;letter-spacing:-0.01em}
+.fr-val{font-size:15px;color:var(--text-3);max-width:60%;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr-val.set{color:var(--text)}
+.fr-arr{font-size:11px;color:var(--text-3);margin-left:5px}
+.fr-auto{font-size:13px;color:var(--green);max-width:58%;text-align:right}
+.badge{font-size:11px;color:var(--green);background:var(--green-lt);padding:2px 7px;border-radius:8px;margin-left:6px;font-weight:500}
+
+/* ===== BUTTONS ===== */
+.btn{width:100%;padding:16px;border:none;border-radius:14px;font-size:17px;font-weight:600;cursor:pointer;letter-spacing:-0.02em;transition:opacity 0.1s}
+.btn:active{opacity:0.8}
+.btn-primary{background:var(--green);color:#fff}
+.btn-secondary{background:var(--card);color:var(--text);border:0.5px solid var(--border);margin-top:8px}
+.btn-cupin{background:var(--blue);color:#fff;margin-top:10px;display:flex;align-items:center;justify-content:center;gap:8px}
+
+/* ===== HOME ===== */
+.home-hero{background:linear-gradient(135deg,var(--green-dk) 0%,var(--green) 100%);padding:calc(var(--safe-top) + 48px) 24px 40px;color:#fff;text-align:center}
+.home-logo{font-size:48px;margin-bottom:12px}
+.home-title{font-size:28px;font-weight:700;letter-spacing:-0.04em;margin-bottom:6px}
+.home-sub{font-size:14px;opacity:0.75;letter-spacing:0.01em}
+.home-body{padding:24px 16px calc(var(--safe-bot) + 24px)}
+.home-rounds{margin-top:16px}
+.round-item{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:0.5px solid var(--border-lt);cursor:pointer}
+.round-item:last-child{border-bottom:none}
+.round-item:active{background:#F0EEE8}
+.round-icon{width:40px;height:40px;border-radius:10px;background:var(--green-lt);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.round-info{flex:1;min-width:0}
+.round-name{font-size:15px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.round-date{font-size:12px;color:var(--text-2);margin-top:2px}
+.round-score{font-size:17px;font-weight:600;color:var(--green)}
+
+/* ===== SCORE STRIP ===== */
+.score-strip{display:flex;align-items:center;justify-content:space-between;background:var(--card);border:0.5px solid var(--border);border-radius:14px;padding:16px 20px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+.score-big{font-size:44px;font-weight:700;line-height:1;letter-spacing:-0.04em}
+.score-right{text-align:right}
+.score-vs{font-size:18px;font-weight:600;letter-spacing:-0.02em}
+.score-hint{font-size:11px;color:var(--text-2);margin-top:2px}
+
+/* ===== HOLE GRID ===== */
+.half-block{margin-bottom:12px}
+.half-label{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;padding:0 2px}
+.hole-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:4px}
+.hbtn{border:0.5px solid var(--border);border-radius:8px;padding:8px 2px 6px;font-size:13px;font-weight:600;cursor:pointer;background:var(--card);color:var(--text);display:flex;flex-direction:column;align-items:center;gap:2px;min-height:48px;justify-content:center;transition:opacity 0.1s;letter-spacing:-0.02em}
+.hbtn:active{opacity:0.7}
+.hbtn .hs{font-size:10px;font-weight:500}
+.hbtn.cur{border-color:var(--green);background:var(--green-lt);color:var(--green-dk)}
+.hbtn.eagle{background:var(--blue);color:#fff;border-color:var(--blue)}
+.hbtn.birdie{background:var(--green);color:#fff;border-color:var(--green)}
+.hbtn.par_{background:#EBEBEB;border-color:#D4D4D0}
+.hbtn.bogey{background:var(--amber-lt);border-color:var(--amber);color:#633806}
+.hbtn.dbogey{background:var(--red-lt);border-color:var(--red);color:#A32D2D}
+.legend{display:flex;flex-wrap:wrap;gap:6px 12px;padding:12px 16px}
+.leg-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2)}
+.leg-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+
+/* ===== SHOT LIST ===== */
+.shot-item{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:0.5px solid var(--border-lt);cursor:pointer;transition:background 0.1s}
+.shot-item:last-child{border-bottom:none}
+.shot-item:active{background:#F0EEE8}
+.shot-num{width:30px;height:30px;border-radius:50%;background:var(--green-lt);color:var(--green-dk);font-size:13px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.shot-num.is-putt{background:var(--blue-lt);color:var(--blue)}
+.shot-body{flex:1;min-width:0}
+.shot-club{font-size:15px;font-weight:500;letter-spacing:-0.01em}
+.shot-dtl{font-size:12px;color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.shot-meta{font-size:12px;color:var(--text-2)}
+.empty-shots{padding:24px 16px;text-align:center;color:var(--text-2);font-size:14px}
+
+/* ===== ADD SHOT BTN ===== */
+.add-shot-btn{width:calc(100% - 32px);margin:10px 16px;padding:15px;background:var(--green);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;letter-spacing:-0.01em;transition:opacity 0.1s}
+.add-shot-btn:active{opacity:0.8}
+
+/* ===== TABS ===== */
+.tabs{display:flex;border-bottom:0.5px solid var(--border);background:var(--card);position:sticky;top:var(--topbar-h,60px);z-index:40}
+.tab{flex:1;padding:12px 4px;font-size:14px;border:none;background:none;cursor:pointer;color:var(--text-2);border-bottom:2px solid transparent;margin-bottom:-0.5px;font-weight:400;letter-spacing:-0.01em;transition:color 0.15s}
+.tab.active{color:var(--green);border-bottom-color:var(--green);font-weight:600}
+.tab-pane{display:none}.tab-pane.active{display:block}
+.sf-sec{padding:16px 16px calc(var(--safe-bot) + 20px)}
+.sf-sec-lbl{font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:6px;margin-top:14px}
+.sf-sec-lbl:first-child{margin-top:0}
+
+/* ===== SUMMARY ===== */
+.stat-row{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;border-bottom:0.5px solid var(--border-lt);font-size:15px}
+.stat-row:last-child{border-bottom:none}
+.stat-v{font-weight:600;letter-spacing:-0.02em}
+
+/* ===== NOTE AREA ===== */
+.note-area{padding:14px 16px}
+.note-area textarea{width:100%;font-size:14px;font-family:inherit;color:var(--text);background:none;border:none;resize:none;min-height:64px;outline:none;line-height:1.6;letter-spacing:-0.01em}
+
+/* ===== DRUM OVERLAY ===== */
+.drum-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:flex-end;justify-content:center;backdrop-filter:blur(2px)}
+.drum-overlay.open{display:flex}
+.drum-sheet{background:var(--card);border-radius:20px 20px 0 0;width:100%;max-width:430px;padding-bottom:calc(var(--safe-bot) + 4px);box-shadow:0 -4px 24px rgba(0,0,0,0.12)}
+.drum-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;border-bottom:0.5px solid var(--border)}
+.drum-ttl{font-size:16px;font-weight:600;letter-spacing:-0.02em}
+.drum-done{background:none;border:none;font-size:15px;color:var(--green);cursor:pointer;font-weight:600;padding:6px 0}
+.drum-cancel{background:none;border:none;font-size:15px;color:var(--text-2);cursor:pointer;padding:6px 0}
+.drum-desc{font-size:13px;color:var(--text-2);padding:8px 16px 6px;line-height:1.5;min-height:40px;border-bottom:0.5px solid var(--border-lt);background:var(--bg)}
+.drum-wrap{position:relative;height:220px;overflow:hidden}
+.d-fade-t{position:absolute;top:0;left:0;right:0;height:88px;background:linear-gradient(to bottom,var(--card),transparent);z-index:2;pointer-events:none}
+.d-fade-b{position:absolute;bottom:0;left:0;right:0;height:88px;background:linear-gradient(to top,var(--card),transparent);z-index:2;pointer-events:none}
+.d-sel{position:absolute;top:88px;left:16px;right:16px;height:44px;border-top:1.5px solid var(--green);border-bottom:1.5px solid var(--green);z-index:3;pointer-events:none;border-radius:8px;background:var(--green-lt);opacity:0.35}
+.d-scroll{position:absolute;inset:0;overflow-y:scroll;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-snap-type:y mandatory;padding-top:88px;padding-bottom:88px}
+.d-scroll::-webkit-scrollbar{display:none}
+.d-item{height:44px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--text);user-select:none;scroll-snap-align:center;flex-shrink:0;letter-spacing:-0.01em}
+.drum-multicol{display:flex;height:220px}
+.dcol{flex:1;position:relative;overflow:hidden;border-right:0.5px solid var(--border-lt)}
+.dcol:last-child{border-right:none}
+.dcol .d-fade-t{background:linear-gradient(to bottom,var(--card),transparent)}
+.dcol .d-fade-b{background:linear-gradient(to top,var(--card),transparent)}
+.dcol .d-sel{left:2px;right:2px}
+.dcol .d-scroll{position:absolute;inset:0}
+.dcol-lbl{position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:10px;color:var(--text-2);z-index:5;pointer-events:none;font-weight:600;letter-spacing:0.04em}
+
+/* ===== MODAL ===== */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:300;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(4px)}
+.modal-overlay.open{display:flex}
+.modal-box{background:var(--card);border-radius:20px;width:100%;max-width:360px;padding:28px 24px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,0.2)}
+.modal-icon{font-size:44px;margin-bottom:10px}
+.modal-title{font-size:20px;font-weight:700;letter-spacing:-0.03em;margin-bottom:6px}
+.modal-sub{font-size:15px;color:var(--text-2);margin-bottom:22px;line-height:1.6;white-space:pre-line}
+.modal-btn{width:100%;padding:15px;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;margin-top:8px;letter-spacing:-0.01em;transition:opacity 0.1s}
+.modal-btn:active{opacity:0.8}
+.modal-btn.primary{background:var(--green);color:#fff}
+.modal-btn.secondary{background:var(--bg);color:var(--text);border:0.5px solid var(--border)}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ===== HOME ===== -->
+<div id="s0" class="screen active">
+  <div class="home-hero">
+    <div class="home-logo">⛳</div>
+    <div class="home-title">ラウンド記録</div>
+    <div class="home-sub">一打一打を、データに。</div>
+  </div>
+  <div class="home-body">
+    <button class="btn btn-primary" onclick="goTo('s1')">+ 新しいラウンドを開始</button>
+    <div id="home-list"></div>
+  </div>
+</div>
+
+<!-- ===== SETUP ===== -->
+<div id="s1" class="screen">
+  <div class="topbar">
+    <button class="nav-btn" onclick="goTo('s0')">キャンセル</button>
+    <div class="topbar-title" style="text-align:center">ラウンド設定</div>
+    <button class="nav-btn right" onclick="startRound()">開始</button>
+  </div>
+  <div class="content">
+    <div class="sec-lbl">基本情報</div>
+    <div class="card">
+      <div class="fr" onclick="openDate()"><span class="fr-lbl">日付</span><span class="fr-val set" id="r-date-v">今日</span><span class="fr-arr">›</span></div>
+      <div class="fr no-tap"><span class="fr-lbl">ゴルフ場名</span><input id="r-course" type="text" placeholder="コース名を入力" inputmode="text" style="border:none;background:none;font-size:15px;color:var(--text);text-align:right;width:55%;outline:none;font-family:inherit"></div>
+      <div class="fr" onclick="openDrum('スタート',null,['OUT（1番スタート）','IN（10番スタート）'],'r-side')"><span class="fr-lbl">スタート</span><span class="fr-val set" id="r-side-v">OUT（1番〜）</span><span class="fr-arr">›</span></div>
+    </div>
+    <div class="sec-lbl">コース状態</div>
+    <div class="card">
+      <div class="fr" onclick="openGreenDrum()"><span class="fr-lbl">グリーンの種類</span><span class="fr-val" id="r-green-v">選択</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('グリーンスピード','スティンプメーターの数値が目安',greenSpeeds,'r-gspd')"><span class="fr-lbl">グリーンスピード</span><span class="fr-val" id="r-gspd-v">選択</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('天気',null,weathers,'r-weather')"><span class="fr-lbl">天気</span><span class="fr-val set" id="r-weather-v">晴れ</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('フェアウェイ状態','芝や地面の硬さ・濡れ具合',fwConds,'r-fw')"><span class="fr-lbl">フェアウェイ状態</span><span class="fr-val" id="r-fw-v">選択</span><span class="fr-arr">›</span></div>
+    </div>
+    <div class="sec-lbl">プレーヤー情報</div>
+    <div class="card">
+      <div class="fr" onclick="openDrum('ハンディキャップ',null,hcpList,'r-hcp')"><span class="fr-lbl">ハンディキャップ</span><span class="fr-val set" id="r-hcp-v">0</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('体調','今日の体のコンディション',bodyList,'r-body')"><span class="fr-lbl">体調</span><span class="fr-val" id="r-body-v">選択</span><span class="fr-arr">›</span></div>
+    </div>
+    <div class="sec-lbl">目標メモ</div>
+    <div class="card"><div class="note-area"><textarea id="r-goal" placeholder="今日の目標や意識するポイント&#10;例）パーオン率70%、3パット撲滅" rows="3"></textarea></div></div>
+    <button class="btn btn-primary" onclick="startRound()" style="margin-top:8px">ラウンド開始</button>
+  </div>
+</div>
+
+<!-- ===== OVERVIEW ===== -->
+<div id="s2" class="screen">
+  <div class="topbar">
+    <button class="nav-btn" onclick="goTo('s0')">ホーム</button>
+    <div style="flex:1;text-align:center">
+      <div class="topbar-title" id="ov-course" style="font-size:15px"></div>
+      <div style="font-size:11px;color:var(--text-2)" id="ov-date"></div>
+    </div>
+    <button class="nav-btn right" onclick="showSummary()">集計</button>
+  </div>
+  <div class="content">
+    <div class="score-strip">
+      <div><div class="score-big" id="ov-total">-</div><div style="font-size:12px;color:var(--text-2);margin-top:3px" id="ov-played">未プレー</div></div>
+      <div class="score-right"><div class="score-vs" id="ov-vs">-</div><div class="score-hint">par比</div></div>
+    </div>
+    <div id="grid-wrap"></div>
+    <div class="card"><div class="legend">
+      <div class="leg-item"><div class="leg-dot" style="background:var(--blue)"></div>イーグル以上</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>バーディ</div>
+      <div class="leg-item"><div class="leg-dot" style="background:#BBBBB7"></div>パー</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--amber)"></div>ボギー</div>
+      <div class="leg-item"><div class="leg-dot" style="background:var(--red)"></div>ダブル以上</div>
+    </div></div>
+  </div>
+</div>
+
+<!-- ===== HOLE ===== -->
+<div id="s3" class="screen">
+  <div class="topbar">
+    <button class="nav-btn" onclick="goTo('s2')">一覧</button>
+    <div style="flex:1;text-align:center">
+      <div class="topbar-title" id="h-title"></div>
+      <div style="font-size:11px;color:var(--text-2)" id="h-meta"></div>
+    </div>
+    <button class="nav-btn right" onclick="openHoleSetup()">設定</button>
+  </div>
+  <div style="padding:12px 16px 0">
+    <div class="score-strip" style="margin-bottom:8px">
+      <div><div class="score-big" id="h-big" style="font-size:40px">-</div></div>
+      <div class="score-right"><div class="score-vs" id="h-vspar" style="font-size:17px"></div><div class="score-hint" id="h-vslbl"></div></div>
+    </div>
+  </div>
+  <div style="padding:0 16px 6px;font-size:12px;color:var(--text-2);display:flex;justify-content:space-between;align-items:center">
+    <span style="font-weight:600;text-transform:uppercase;letter-spacing:0.06em;font-size:11px">ショット</span>
+    <span id="h-cnt" style="font-weight:500"></span>
+  </div>
+  <div class="card" style="margin:0 16px">
+    <div id="shot-list"><div class="empty-shots">ショットを追加してください</div></div>
+  </div>
+  <button class="add-shot-btn" onclick="openShotForm(-1)">+ ショットを追加</button>
+  <div style="padding:0 16px;margin-top:4px">
+    <div class="card">
+      <div style="padding:12px 16px 4px;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.06em">ホールメモ</div>
+      <div class="note-area"><textarea id="h-note" placeholder="グリーンの傾斜、戦略メモなど" rows="3" oninput="holes[curHole].note=this.value"></textarea></div>
+    </div>
+  </div>
+  <div style="height:calc(var(--safe-bot) + 20px)"></div>
+</div>
+
+<!-- ===== SHOT FORM ===== -->
+<div id="s4" class="screen">
+  <div class="topbar" id="sf-topbar">
+    <button class="nav-btn" onclick="goTo('s3')">キャンセル</button>
+    <div class="topbar-title" style="text-align:center" id="sf-title">ショット入力</div>
+    <button class="nav-btn right" onclick="saveShot()">保存</button>
+  </div>
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab(0,this)">基本</button>
+    <button class="tab" onclick="switchTab(1,this)">着弾・評価</button>
+  </div>
+  <!-- TAB 0 基本 -->
+  <div id="tp0" class="tab-pane active"><div class="sf-sec">
+    <div class="sf-sec-lbl">番手</div>
+    <div class="card">
+      <div class="fr" onclick="openDrum('番手',null,clubs,'sf-club')"><span class="fr-lbl">クラブ</span><span class="fr-val" id="sf-club-v">選択</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('ショット種類',null,shotTypes,'sf-stype')"><span class="fr-lbl">ショット種類</span><span class="fr-val set" id="sf-stype-v">フルショット</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('意図した球筋',null,shotShapes,'sf-shape')"><span class="fr-lbl">意図した球筋</span><span class="fr-val set" id="sf-shape-v">ストレート</span><span class="fr-arr">›</span></div>
+    </div>
+    <div class="sf-sec-lbl">距離</div>
+    <div class="card">
+      <div class="fr" onclick="openDistAdaptive('残距離（ピンまで）','sf-dist')"><span class="fr-lbl">残距離</span><span class="fr-val" id="sf-dist-v">-</span><span class="fr-arr">›</span></div>
+      <div class="fr no-tap"><span class="fr-lbl">打った距離<span class="badge">自動</span></span><span class="fr-auto" id="sf-hitdist-v">次打の残距離から計算</span></div>
+      <div class="fr" onclick="openDrum('風向き',null,windDirs,'sf-wind')"><span class="fr-lbl">風向き</span><span class="fr-val set" id="sf-wind-v">無風</span><span class="fr-arr">›</span></div>
+    </div>
+    <div class="sf-sec-lbl">ライ・傾斜</div>
+    <div class="card">
+      <div class="fr" onclick="openDrum('ライ','ボールが止まっている場所の状態',lies,'sf-lie')"><span class="fr-lbl">ライ（打つ場所）</span><span class="fr-val" id="sf-lie-v">選択</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('傾斜・スタンス','足場の状態',slopes,'sf-slope')"><span class="fr-lbl">傾斜</span><span class="fr-val set" id="sf-slope-v">フラット</span><span class="fr-arr">›</span></div>
+    </div>
+  </div></div>
+  <!-- TAB 1 着弾・評価 -->
+  <div id="tp1" class="tab-pane"><div class="sf-sec">
+    <div id="land-sec">
+      <div class="sf-sec-lbl">着弾地点</div>
+      <div class="card">
+        <div class="fr" onclick="openDrum('着弾地点','ボールが落ちた場所',landingSpots,'sf-land')"><span class="fr-lbl">着弾</span><span class="fr-val" id="sf-land-v">選択</span><span class="fr-arr">›</span></div>
+        <div class="fr" onclick="openDrum('目標との方向ずれ','狙いに対してどこにいったか',dirDevs,'sf-dir')"><span class="fr-lbl">方向ずれ</span><span class="fr-val" id="sf-dir-v">選択</span><span class="fr-arr">›</span></div>
+        <div class="fr" onclick="openDrum('距離感','目標距離との誤差',distFeels,'sf-distfeel')"><span class="fr-lbl">距離感</span><span class="fr-val" id="sf-distfeel-v">選択</span><span class="fr-arr">›</span></div>
+      </div>
+    </div>
+    <div id="putt-sec" style="display:none">
+      <div class="sf-sec-lbl">パット</div>
+      <div class="card">
+        <div class="fr" onclick="openDrum('ブレーク','グリーンの切れ方',puttBreaks,'sf-pbreak')"><span class="fr-lbl">ブレーク（切れ方）</span><span class="fr-val" id="sf-pbreak-v">選択</span><span class="fr-arr">›</span></div>
+        <div class="fr" onclick="openDrum('グリーン速度感','実際に打って感じた速さ',greenSpdFeel,'sf-gspd')"><span class="fr-lbl">グリーン速度感</span><span class="fr-val" id="sf-gspd-v">選択</span><span class="fr-arr">›</span></div>
+      </div>
+      <button class="btn btn-cupin" onclick="onCupIn()">⛳ カップイン</button>
+    </div>
+    <div class="sf-sec-lbl">ショット評価</div>
+    <div class="card">
+      <div class="fr" onclick="openDrum('方向性',null,accRatings,'sf-acc')"><span class="fr-lbl">方向性</span><span class="fr-val" id="sf-acc-v">-</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('距離感',null,distRatings,'sf-distr')"><span class="fr-lbl">距離感</span><span class="fr-val" id="sf-distr-v">-</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('インパクト感',null,impactRatings,'sf-impact')"><span class="fr-lbl">インパクト感</span><span class="fr-val" id="sf-impact-v">-</span><span class="fr-arr">›</span></div>
+    </div>
+    <div class="sf-sec-lbl">メモ</div>
+    <div class="card"><div class="note-area"><textarea id="sf-note" placeholder="気づき・次回への改善メモ" rows="4"></textarea></div></div>
+    <button class="btn btn-primary" onclick="saveShot()" style="margin-top:4px">保存</button>
+  </div></div>
+</div>
+
+<!-- ===== SUMMARY ===== -->
+<div id="s5" class="screen">
+  <div class="topbar">
+    <button class="nav-btn" onclick="goTo('s2')">← 戻る</button>
+    <div class="topbar-title" style="text-align:center">サマリー</div>
+  </div>
+  <div class="content" id="sum-content"></div>
+</div>
+
+<!-- ===== HOLE SETUP MODAL ===== -->
+<div class="drum-overlay" id="hsetup-ov">
+  <div class="drum-sheet">
+    <div class="drum-hdr">
+      <button class="drum-cancel" onclick="closeHoleSetup()">キャンセル</button>
+      <span class="drum-ttl" id="hsetup-ttl"></span>
+      <button class="drum-done" onclick="saveHoleSetup()">完了</button>
+    </div>
+    <div style="padding:12px 16px">
+      <div class="card">
+        <div class="fr" onclick="openDrum('パー',null,['Par 3','Par 4','Par 5'],'hs-par')"><span class="fr-lbl">パー</span><span class="fr-val set" id="hs-par-v">Par 4</span><span class="fr-arr">›</span></div>
+        <div class="fr" onclick="openDist('ホールの距離（ヤード）','hs-hdist',false)"><span class="fr-lbl">距離</span><span class="fr-val" id="hs-hdist-v">-</span><span class="fr-arr">›</span></div>
+        <div class="fr" onclick="openDrum('グリーンピン位置',null,pinPositions,'hs-pin')"><span class="fr-lbl">ピン位置</span><span class="fr-val" id="hs-pin-v">-</span><span class="fr-arr">›</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DRUM ===== -->
+<div class="drum-overlay" id="drum-ov">
+  <div class="drum-sheet">
+    <div class="drum-hdr">
+      <button class="drum-cancel" onclick="closeDrum(false)">キャンセル</button>
+      <span class="drum-ttl" id="drum-ttl"></span>
+      <button class="drum-done" onclick="closeDrum(true)">完了</button>
+    </div>
+    <div class="drum-desc" id="drum-desc" style="display:none"></div>
+    <div class="drum-wrap">
+      <div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div>
+      <div class="d-scroll" id="drum-sc"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== GREEN DRUM ===== -->
+<div class="drum-overlay" id="green-ov">
+  <div class="drum-sheet">
+    <div class="drum-hdr">
+      <button class="drum-cancel" onclick="closeGreenDrum(false)">キャンセル</button>
+      <span class="drum-ttl">グリーンの種類</span>
+      <button class="drum-done" onclick="closeGreenDrum(true)">完了</button>
+    </div>
+    <div class="drum-desc" id="green-desc"></div>
+    <div class="drum-wrap">
+      <div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div>
+      <div class="d-scroll" id="green-sc"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DIST ===== -->
+<div class="drum-overlay" id="dist-ov">
+  <div class="drum-sheet">
+    <div class="drum-hdr">
+      <button class="drum-cancel" onclick="closeDist(false)">キャンセル</button>
+      <span class="drum-ttl" id="dist-ttl"></span>
+      <button class="drum-done" onclick="closeDist(true)">完了</button>
+    </div>
+    <div class="drum-wrap">
+      <div class="d-fade-t"></div><div class="d-fade-b"></div>
+      <div class="drum-multicol">
+        <div class="dcol"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dc100"></div><div class="dcol-lbl">百</div></div>
+        <div class="dcol"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dc10"></div><div class="dcol-lbl">十</div></div>
+        <div class="dcol"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dc1"></div><div class="dcol-lbl">一</div></div>
+        <div class="dcol" style="flex:0.6"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dcU"></div><div class="dcol-lbl">単位</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== DATE ===== -->
+<div class="drum-overlay" id="date-ov">
+  <div class="drum-sheet">
+    <div class="drum-hdr">
+      <button class="drum-cancel" onclick="closeDate(false)">キャンセル</button>
+      <span class="drum-ttl">日付</span>
+      <button class="drum-done" onclick="closeDate(true)">完了</button>
+    </div>
+    <div class="drum-wrap">
+      <div class="d-fade-t"></div><div class="d-fade-b"></div>
+      <div class="drum-multicol">
+        <div class="dcol"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dYr"></div><div class="dcol-lbl">年</div></div>
+        <div class="dcol"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dMo"></div><div class="dcol-lbl">月</div></div>
+        <div class="dcol"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dDy"></div><div class="dcol-lbl">日</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== CUPIN MODAL ===== -->
+<div class="modal-overlay" id="cupin-modal">
+  <div class="modal-box">
+    <div class="modal-icon">⛳</div>
+    <div class="modal-title" id="cupin-title">カップイン！</div>
+    <div class="modal-sub" id="cupin-sub"></div>
+    <button class="modal-btn primary" id="cupin-next-btn" onclick="goNextHole()"></button>
+    <button class="modal-btn secondary" onclick="closeCupinModal()">このホールに留まる</button>
+  </div>
+</div>
+
+</div><!-- .app -->
+
+<script>
+const IH=44;
+const greenTypes=[
+  {v:'ベント芝',desc:'関東・東北に多い。冬でも緑でやや固め。ボールが止まりやすい'},
+  {v:'コウライ芝',desc:'関西・九州に多い日本固有品種。夏は青々、冬枯れる。球が沈みやすい'},
+  {v:'バミューダ芝',desc:'南国系。リゾートコースなどに多い。葉が厚く球が浮きやすい'},
+  {v:'ポア・アニュア芝',desc:'冬に生える雑草芝。凸凹でパットが難しくなりやすい'},
+  {v:'ティフトン芝',desc:'沖縄などに多い南方系。硬く締まって転がりやすい'}
+];
+const greenSpeeds=['遅い（8以下）','普通（9〜10）','速い（11〜12）','超高速（13以上）'];
+const weathers=['晴れ','晴れのち曇り','曇り','曇りのち雨','雨','小雨','強風','霧'];
+const fwConds=['湿潤（雨上がり）','やや湿','普通','やや乾燥','乾燥・硬い'];
+const bodyList=['絶好調','良好','普通','やや不調','不調'];
+const hcpList=Array.from({length:37},(_,i)=>(i*0.5)+'');
+const clubs=['1W（ドライバー）','3W','5W','UT（ユーティリティ）','3I','4I','5I','6I','7I','8I','9I','PW（Pウェッジ）','AW（Aウェッジ）','SW（Sウェッジ）','LW（Lウェッジ）','パター'];
+const shotTypes=['フルショット','3/4スイング','1/2スイング','アプローチ','チップ','バンカーショット','パット','ロブショット','ランニングアプローチ'];
+const shotShapes=['ストレート','ドロー（右→左）','フェード（左→右）','ハイボール','ローボール','スピン系'];
+const windDirs=['無風','向かい風','追い風','左から','右から','左斜め向かい','右斜め向かい','左斜め追い','右斜め追い'];
+const lies=['フェアウェイ','ラフ（薄め）','ラフ（深め）','ティーグラウンド','バンカー（砂の上）','グリーン','フリンジ（エッジ）','ベアグラウンド（土）','ディボット跡'];
+const slopes=['フラット','つま先上がり','つま先下がり','左足上がり','左足下がり'];
+const landingSpots=['フェアウェイ','ラフ（薄）','ラフ（深）','グリーン（オン）','グリーンオーバー','バンカー','OB','池・ウォーター','フリンジ','木の中','ベアグラウンド'];
+const dirDevs=['センター（目標通り）','左','右','左奥','右奥','左手前','右手前','奥','手前'];
+const distFeels=['ぴったり','少し短い（5y以内）','少し長い（5y以内）','かなり短い','かなり長い'];
+const puttBreaks=['左に切れる','右に切れる','ストレート','フックライン','スライスライン'];
+const greenSpdFeel=['遅く感じた','普通','速く感じた'];
+const accRatings=['◎ 完璧（±0〜2y/m以内）','○ 良い（±3〜5y/m）','△ 普通（±6〜10y/m）','× 悪い（±11y/m以上）'];
+const distRatings=['◎ 完璧（±0〜3y以内）','○ 良い（±4〜7y）','△ 普通（±8〜15y）','× 悪い（±16y以上）'];
+const impactRatings=['◎ 芯を食った','○ 概ね良い','△ 薄め','× ミスヒット'];
+const pinPositions=['手前左','手前右','センター','奥左','奥右','エッジ手前','エッジ奥'];
+
+let R={date:'',course:'',side:'OUT',greenType:'',gspd:'',weather:'晴れ',fw:'',hcp:'0',body:'',goal:''};
+let holes=[],savedRounds=[];
+let curHole=0,editShot=-1;
+let DV={},SF={};
+let drumKey='',drumArr=[];
+let distKey='',distIsPutt=false;
+
+// ===== STORAGE =====
+function saveRound(){try{const key='golf_rounds_v1';const existing=JSON.parse(localStorage.getItem(key)||'[]');const idx=existing.findIndex(r=>r.id===R.id);const data={...R,holes:[...holes]};if(idx>=0)existing[idx]=data;else existing.unshift(data);localStorage.setItem(key,JSON.stringify(existing.slice(0,20)));}catch(e){}}
+function loadRounds(){try{return JSON.parse(localStorage.getItem('golf_rounds_v1')||'[]');}catch(e){return [];}}
+
+function fmtDate(d){return d.getFullYear()+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getDate().toString().padStart(2,'0');}
+function initHoles(){holes=Array.from({length:18},(_,i)=>({num:i+1,par:4,dist:0,pin:'',shots:[],note:'',finished:false}));}
+
+// ===== NAVIGATE =====
+function goTo(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+  if(id==='s0')renderHome();
+  if(id==='s2')renderGrid();
+  if(id==='s3')renderHole();
+}
+
+function renderHome(){
+  const rounds=loadRounds();
+  const el=document.getElementById('home-list');
+  if(!rounds.length){el.innerHTML='';return;}
+  el.innerHTML=`<div class="sec-lbl" style="margin-top:24px">過去のラウンド</div><div class="card">
+    ${rounds.slice(0,5).map(r=>{
+      const tot=r.holes?r.holes.reduce((a,h)=>a+h.shots.length,0):0;
+      const totPar=r.holes?r.holes.reduce((a,h)=>a+(h.shots.length?h.par:0),0):0;
+      const vs=tot-totPar;const vsStr=tot?( vs===0?'E':vs>0?'+'+vs:vs):'-';
+      return `<div class="round-item" onclick="loadRound('${r.id}')">
+        <div class="round-icon">⛳</div>
+        <div class="round-info"><div class="round-name">${r.course}</div><div class="round-date">${r.date} / ${r.side}</div></div>
+        <div class="round-score">${tot||'-'}<span style="font-size:13px;font-weight:500;color:var(--text-2);margin-left:4px">${tot?vsStr:''}</span></div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function loadRound(id){
+  const rounds=loadRounds();
+  const r=rounds.find(x=>x.id===id);
+  if(!r)return;
+  R={...r};holes=[...r.holes];curHole=0;
+  sv('r-date-v',R.date);sv('r-side-v',R.side==='OUT'?'OUT（1番〜）':'IN（10番〜）');
+  sv('r-weather-v',R.weather);sv('r-hcp-v',R.hcp);
+  goTo('s2');
+}
+
+function sv(key,val){
+  DV[key]=val;
+  const el=document.getElementById(key);
+  if(!el)return;
+  const empty=!val||val==='-'||val==='選択';
+  el.textContent=val||'選択';
+  if(el.classList.contains('fr-val'))el.className=empty?'fr-val':'fr-val set';
+}
+function gv(key){return DV[key]||'';}
+function getIdx(sc,len){return Math.max(0,Math.min(Math.round(sc.scrollTop/IH),len-1));}
+function fillScroll(sc,items,initIdx){
+  sc.innerHTML='';
+  items.forEach(txt=>{const d=document.createElement('div');d.className='d-item';d.textContent=txt;sc.appendChild(d);});
+  sc.scrollTop=Math.max(0,initIdx)*IH;
+}
+
+function isPutt(){return (SF.club||'').includes('パター');}
+function updatePuttSection(){
+  const p=isPutt();
+  document.getElementById('land-sec').style.display=p?'none':'block';
+  document.getElementById('putt-sec').style.display=p?'block':'none';
+}
+
+// ===== ROUND =====
+function startRound(){
+  R.id='r_'+Date.now();
+  R.course=document.getElementById('r-course').value||'コース未設定';
+  R.goal=document.getElementById('r-goal').value;
+  if(!R.date)R.date=fmtDate(new Date());
+  initHoles();curHole=0;
+  saveRound();goTo('s2');
+}
+function isIN(){return R.side==='IN';}
+function hNum(idx){return isIN()?(idx<9?idx+10:idx-8):idx+1;}
+
+// ===== GRID =====
+function renderGrid(){
+  const w=document.getElementById('grid-wrap');w.innerHTML='';
+  let tot=0,totPar=0,played=0;
+  const buildH=(lbl,indices)=>{
+    const blk=document.createElement('div');blk.className='half-block';
+    const l=document.createElement('div');l.className='half-label';l.textContent=lbl;blk.appendChild(l);
+    const g=document.createElement('div');g.className='hole-grid';
+    indices.forEach(i=>{
+      const h=holes[i];const s=h.shots.length;let cls='hbtn';let hs='';
+      if(s){played++;tot+=s;totPar+=h.par;const d=s-h.par;
+        if(d<=-2)cls+=' eagle';else if(d===-1)cls+=' birdie';else if(d===0)cls+=' par_';else if(d===1)cls+=' bogey';else cls+=' dbogey';
+        hs=`<span class="hs">${s}</span>`;}
+      if(i===curHole)cls+=' cur';
+      const b=document.createElement('button');b.className=cls;b.innerHTML=`${hNum(i)}${hs}`;b.onclick=()=>{curHole=i;goTo('s3');};g.appendChild(b);
+    });
+    blk.appendChild(g);return blk;
+  };
+  if(isIN()){w.appendChild(buildH('IN（10〜18番）',[0,1,2,3,4,5,6,7,8]));w.appendChild(buildH('OUT（1〜9番）',[9,10,11,12,13,14,15,16,17]));}
+  else{w.appendChild(buildH('OUT（1〜9番）',[0,1,2,3,4,5,6,7,8]));w.appendChild(buildH('IN（10〜18番）',[9,10,11,12,13,14,15,16,17]));}
+  document.getElementById('ov-course').textContent=R.course;
+  document.getElementById('ov-date').textContent=R.date+' / '+R.side;
+  document.getElementById('ov-total').textContent=tot||'-';
+  const vs=tot-totPar;
+  document.getElementById('ov-vs').textContent=tot?(vs===0?'E':vs>0?'+'+vs:vs):'-';
+  document.getElementById('ov-played').textContent=played?played+'H完了':'未プレー';
+}
+
+// ===== HOLE =====
+function renderHole(){
+  const h=holes[curHole];
+  document.getElementById('h-title').textContent=hNum(curHole)+'番ホール';
+  document.getElementById('h-meta').textContent=`Par ${h.par}${h.dist?' | '+h.dist+'y':''}${h.pin?' | ピン:'+h.pin:''}`;
+  updateHScore();renderShots();
+  document.getElementById('h-note').value=h.note||'';
+}
+function updateHScore(){
+  const h=holes[curHole];const s=h.shots.length;
+  document.getElementById('h-cnt').textContent=s?s+'打':'0打';
+  const big=document.getElementById('h-big');const vp=document.getElementById('h-vspar');const vl=document.getElementById('h-vslbl');
+  if(!s){big.textContent='-';vp.textContent='';vl.textContent='';vp.style.color='';return;}
+  big.textContent=s;const d=s-h.par;
+  const LBL={'-3':'アルバトロス','-2':'イーグル','-1':'バーディ','0':'パー','1':'ボギー','2':'ダブルボギー','3':'トリプルボギー'};
+  vp.textContent=d===0?'E':d>0?'+'+d:d;
+  vp.style.color=d<0?'var(--green)':d===0?'var(--text-2)':'var(--red)';
+  vl.textContent=LBL[d]||(d>0?d+'オーバー':Math.abs(d)+'アンダー');
+}
+function recalcHitDist(h){
+  h.shots.forEach((s,i)=>{
+    if(i<h.shots.length-1){const nd=h.shots[i+1].dist;s.hitdist=(s.dist&&nd&&s.dist_unit!=='歩数')?Math.max(0,s.dist-nd):null;}
+    else s.hitdist=null;
+  });
+}
+function renderShots(){
+  const h=holes[curHole];const el=document.getElementById('shot-list');el.innerHTML='';
+  if(!h.shots.length){el.innerHTML='<div class="empty-shots">ショットを追加してください</div>';return;}
+  recalcHitDist(h);
+  h.shots.forEach((s,i)=>{
+    const div=document.createElement('div');div.className='shot-item';
+    const isP=s.club&&s.club.includes('パター');
+    const clubShort=(s.club||'-').replace(/（.*?）/,'').replace(/\(.*?\)/,'');
+    const du=s.dist_unit||'y';
+    const dp=s.hitdist?`${s.hitdist}y打→`:s.dist?`残${s.dist}${du}`:'';
+    const cupMark=s.cupIn?'<span style="color:var(--blue)"> ⛳</span>':'';
+    div.innerHTML=`<div class="shot-num${isP?' is-putt':''}">${i+1}</div>
+      <div class="shot-body">
+        <div class="shot-club">${clubShort}${cupMark} <span style="font-weight:400;font-size:13px;color:var(--text-2)">${dp}</span></div>
+        <div class="shot-dtl">${[s.lie,s.land||s.pbreak,s.dir].filter(Boolean).join(' → ')}</div>
+      </div>
+      <span class="shot-meta">${s.acc||''}</span>`;
+    div.onclick=()=>openShotForm(i);el.appendChild(div);
+  });
+}
+function getLieDefault(h,idx){
+  if(idx===0)return 'ティーグラウンド';
+  const prev=h.shots[idx-1];if(!prev||!prev.land)return '';
+  const m={'フェアウェイ':'フェアウェイ','ラフ（薄）':'ラフ（薄め）','ラフ（深）':'ラフ（深め）','グリーン（オン）':'グリーン','グリーンオーバー':'ラフ（薄め）','バンカー':'バンカー（砂の上）','フリンジ':'フリンジ（エッジ）','ベアグラウンド':'ベアグラウンド（土）','OB':'ラフ（深め）','木の中':'ラフ（深め）','池・ウォーター':'フェアウェイ'};
+  return m[prev.land]||'';
+}
+
+// ===== SHOT FORM =====
+function openShotForm(idx){
+  editShot=idx;SF={};
+  const h=holes[curHole];const shotIdx=idx<0?h.shots.length:idx;
+  ['sf-club','sf-lie','sf-land','sf-dir','sf-distfeel','sf-pbreak','sf-gspd','sf-acc','sf-distr','sf-impact'].forEach(k=>{const el=document.getElementById(k+'-v');if(el){el.textContent='選択';el.className='fr-val';}});
+  const distEl=document.getElementById('sf-dist-v');if(distEl){distEl.textContent='-';distEl.className='fr-val';}
+  document.getElementById('sf-note').value='';
+  document.getElementById('sf-hitdist-v').textContent='次打の残距離から計算';
+  // デフォルト
+  _sv('sf-stype-v','フルショット');SF.stype='フルショット';
+  _sv('sf-shape-v','ストレート');SF.shape='ストレート';
+  _sv('sf-wind-v','無風');SF.wind='無風';
+  _sv('sf-slope-v','フラット');SF.slope='フラット';
+  const lieD=getLieDefault(h,shotIdx);if(lieD){_sv('sf-lie-v',lieD);SF.lie=lieD;}
+  if(idx>=0){
+    const s=h.shots[idx];Object.assign(SF,s);
+    if(s.club)_sv('sf-club-v',s.club);
+    if(s.stype)_sv('sf-stype-v',s.stype);
+    if(s.shape)_sv('sf-shape-v',s.shape);
+    if(s.wind)_sv('sf-wind-v',s.wind);
+    if(s.lie)_sv('sf-lie-v',s.lie);
+    if(s.slope)_sv('sf-slope-v',s.slope);
+    if(s.land)_sv('sf-land-v',s.land);
+    if(s.dir)_sv('sf-dir-v',s.dir);
+    if(s.distfeel)_sv('sf-distfeel-v',s.distfeel);
+    if(s.dist){const u=s.dist_unit||'y';_sv('sf-dist-v',s.dist+u);}
+    if(s.pbreak)_sv('sf-pbreak-v',s.pbreak);
+    if(s.gspd)_sv('sf-gspd-v',s.gspd);
+    if(s.acc)_sv('sf-acc-v',s.acc);
+    if(s.distr)_sv('sf-distr-v',s.distr);
+    if(s.impact)_sv('sf-impact-v',s.impact);
+    document.getElementById('sf-note').value=s.note||'';
+    if(s.hitdist)document.getElementById('sf-hitdist-v').textContent=s.hitdist+'y（計算済み）';
+  }
+  document.getElementById('sf-title').textContent=idx<0?`${h.shots.length+1}打目`:`${idx+1}打目を編集`;
+  updatePuttSection();
+  switchTab(0,document.querySelector('.tab'));
+  goTo('s4');
+}
+function _sv(id,val){const el=document.getElementById(id);if(!el)return;el.textContent=val;if(el.classList.contains('fr-val'))el.className='fr-val set';}
+
+function saveShot(){
+  const h=holes[curHole];
+  const shot={...SF,note:document.getElementById('sf-note').value};
+  if(editShot<0)h.shots.push(shot);else h.shots[editShot]=shot;
+  recalcHitDist(h);saveRound();goTo('s3');
+}
+function switchTab(i,el){
+  document.querySelectorAll('.tab-pane').forEach((p,j)=>p.classList.toggle('active',j===i));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  if(el)el.classList.add('active');else document.querySelectorAll('.tab')[i]?.classList.add('active');
+}
+
+// ===== CUP IN =====
+function onCupIn(){
+  const h=holes[curHole];
+  const shot={...SF,note:document.getElementById('sf-note').value,cupIn:true};
+  if(editShot<0)h.shots.push(shot);else h.shots[editShot]=shot;
+  recalcHitDist(h);h.finished=true;saveRound();
+  const score=h.shots.length;const diff=score-h.par;
+  const labels={'-3':'アルバトロス🦅','-2':'イーグル🦅','-1':'バーディ🐦','0':'パー','1':'ボギー','2':'ダブルボギー','3':'トリプルボギー'};
+  const vs=diff===0?'E':diff>0?'+'+diff:String(diff);
+  document.getElementById('cupin-title').textContent=`${hNum(curHole)}番ホール完了！`;
+  document.getElementById('cupin-sub').textContent=`${score}打 / Par ${h.par}\n${vs}（${labels[diff]||(diff>0?diff+'オーバー':Math.abs(diff)+'アンダー')}）`;
+  const nextIdx=curHole+1;
+  const btn=document.getElementById('cupin-next-btn');
+  btn.textContent=nextIdx<18?`${hNum(nextIdx)}番ホールへ →`:'集計を見る';
+  document.getElementById('cupin-modal').classList.add('open');
+}
+function goNextHole(){
+  closeCupinModal();
+  const nextIdx=curHole+1;
+  if(nextIdx<18){curHole=nextIdx;goTo('s3');}
+  else{goTo('s2');setTimeout(()=>showSummary(),120);}
+}
+function closeCupinModal(){document.getElementById('cupin-modal').classList.remove('open');goTo('s3');}
+
+// ===== HOLE SETUP =====
+function openHoleSetup(){
+  const h=holes[curHole];
+  document.getElementById('hsetup-ttl').textContent=hNum(curHole)+'番ホール設定';
+  _sv('hs-par-v','Par '+h.par);_sv('hs-hdist-v',h.dist?h.dist+'y':'-');_sv('hs-pin-v',h.pin||'-');
+  DV['hs-par']='Par '+h.par;DV['hs-hdist']=h.dist?h.dist+'y':'-';DV['hs-pin']=h.pin||'-';
+  document.getElementById('hsetup-ov').classList.add('open');
+}
+function closeHoleSetup(){document.getElementById('hsetup-ov').classList.remove('open');}
+function saveHoleSetup(){
+  const h=holes[curHole];
+  const pv=DV['hs-par'];if(pv)h.par=parseInt(pv.replace('Par ',''));
+  const dv=DV['hs-hdist'];if(dv&&dv!=='-')h.dist=parseInt(dv);
+  const pn=DV['hs-pin'];if(pn&&pn!=='-')h.pin=pn;
+  closeHoleSetup();saveRound();renderHole();
+}
+
+// ===== DRUM =====
+function openDrum(title,desc,items,key){
+  drumKey=key;drumArr=items.map(it=>typeof it==='object'?it.v:it);
+  document.getElementById('drum-ttl').textContent=title;
+  const dd=document.getElementById('drum-desc');
+  if(desc){dd.textContent=desc;dd.style.display='block';}else{dd.textContent='';dd.style.display='none';}
+  const sc=document.getElementById('drum-sc');
+  const cur=DV[key]||'';
+  fillScroll(sc,drumArr,Math.max(0,drumArr.indexOf(cur)));
+  document.getElementById('drum-ov').classList.add('open');
+}
+function closeDrum(save){
+  if(save){
+    const sc=document.getElementById('drum-sc');
+    const val=drumArr[getIdx(sc,drumArr.length)];
+    DV[drumKey]=val;
+    const el=document.getElementById(drumKey+'-v');
+    if(el){el.textContent=val;el.className='fr-val set';}
+    const field=drumKey.replace(/^sf-/,'');SF[field]=val;
+    if(drumKey==='r-side'){R.side=val.startsWith('OUT')?'OUT':'IN';const el2=document.getElementById('r-side-v');if(el2){el2.textContent=R.side==='OUT'?'OUT（1番〜）':'IN（10番〜）';el2.className='fr-val set';}}
+    if(drumKey==='r-weather')R.weather=val;
+    if(drumKey==='r-gspd')R.gspd=val;
+    if(drumKey==='r-fw')R.fw=val;
+    if(drumKey==='r-hcp'){R.hcp=val;const el2=document.getElementById('r-hcp-v');if(el2){el2.textContent=val;el2.className='fr-val set';}}
+    if(drumKey==='r-body')R.body=val;
+    if(drumKey==='sf-club'){updatePuttSection();DV['sf-dist']='-';SF.dist=null;const dv=document.getElementById('sf-dist-v');if(dv){dv.textContent='-';dv.className='fr-val';}}
+  }
+  document.getElementById('drum-ov').classList.remove('open');
+}
+
+function openGreenDrum(){
+  const sc=document.getElementById('green-sc');
+  const items=greenTypes.map(it=>it.v);
+  const cur=DV['r-green']||'';const initIdx=Math.max(0,items.indexOf(cur));
+  fillScroll(sc,items,initIdx);
+  document.getElementById('green-desc').textContent=greenTypes[initIdx].desc;
+  sc.onscroll=function(){const i=getIdx(sc,greenTypes.length);document.getElementById('green-desc').textContent=greenTypes[i].desc;};
+  document.getElementById('green-ov').classList.add('open');
+}
+function closeGreenDrum(save){
+  if(save){const sc=document.getElementById('green-sc');const val=greenTypes[getIdx(sc,greenTypes.length)].v;DV['r-green']=val;R.greenType=val;const el=document.getElementById('r-green-v');if(el){el.textContent=val;el.className='fr-val set';}}
+  document.getElementById('green-sc').onscroll=null;
+  document.getElementById('green-ov').classList.remove('open');
+}
+
+// ===== DIST =====
+function fillDCol(id,items,initIdx){
+  const sc=document.getElementById(id);sc.innerHTML='';
+  items.forEach(v=>{const d=document.createElement('div');d.className='d-item';d.textContent=v;sc.appendChild(d);});
+  sc.scrollTop=Math.max(0,initIdx)*IH;
+}
+function openDistAdaptive(title,key){distIsPutt=isPutt();openDist(title,key,distIsPutt);}
+function openDist(title,key,isPuttMode){
+  distKey=key;document.getElementById('dist-ttl').textContent=title;
+  const units=isPuttMode?['歩数','y','m']:['y','m'];
+  const cur=DV[key];let n=0;if(cur&&cur!=='-')n=parseInt(cur)||0;
+  let curUnitIdx=0;
+  if(cur&&cur!=='-'){const m=cur.match(/[^\d]+$/);if(m){const ci=units.indexOf(m[0]);if(ci>=0)curUnitIdx=ci;}}
+  fillDCol('dc100',[0,1,2,3,4,5],Math.floor(n/100));
+  fillDCol('dc10',Array.from({length:10},(_,i)=>i),Math.floor((n%100)/10));
+  fillDCol('dc1',Array.from({length:10},(_,i)=>i),n%10);
+  fillDCol('dcU',units,curUnitIdx);
+  document.getElementById('dist-ov').classList.add('open');
+}
+function closeDist(save){
+  if(save){
+    const h100=[0,1,2,3,4,5];
+    const isPuttMode=distIsPutt&&distKey!=='hs-hdist';
+    const units=isPuttMode?['歩数','y','m']:['y','m'];
+    const i100=getIdx(document.getElementById('dc100'),6);
+    const i10=getIdx(document.getElementById('dc10'),10);
+    const i1=getIdx(document.getElementById('dc1'),10);
+    const iU=getIdx(document.getElementById('dcU'),units.length);
+    const num=h100[i100]*100+i10*10+i1;const unit=units[iU];
+    DV[distKey]=num>0?num+unit:'-';
+    const el=document.getElementById(distKey+'-v');
+    if(el){el.textContent=num>0?num+unit:'-';el.className=num>0?'fr-val set':'fr-val';}
+    const field=distKey.replace(/^sf-/,'');
+    if(num>0){SF[field]=num;SF[field+'_unit']=unit;}
+    if(distKey==='hs-hdist'){holes[curHole].dist=num;DV['hs-hdist']=num>0?num+'y':'-';const e2=document.getElementById('hs-hdist-v');if(e2)e2.textContent=num>0?num+'y':'-';}
+  }
+  document.getElementById('dist-ov').classList.remove('open');
+}
+
+// ===== DATE =====
+function openDate(){
+  const now=new Date();
+  fillDCol('dYr',Array.from({length:5},(_,i)=>now.getFullYear()-4+i+'年'),4);
+  fillDCol('dMo',Array.from({length:12},(_,i)=>(i+1)+'月'),now.getMonth());
+  fillDCol('dDy',Array.from({length:31},(_,i)=>(i+1)+'日'),now.getDate()-1);
+  document.getElementById('date-ov').classList.add('open');
+}
+function closeDate(save){
+  if(save){
+    const now=new Date();const yrs=Array.from({length:5},(_,i)=>now.getFullYear()-4+i);
+    const yi=getIdx(document.getElementById('dYr'),5);
+    const mi=getIdx(document.getElementById('dMo'),12);
+    const di=getIdx(document.getElementById('dDy'),31);
+    R.date=`${yrs[yi]}/${String(mi+1).padStart(2,'0')}/${String(di+1).padStart(2,'0')}`;
+    const el=document.getElementById('r-date-v');if(el){el.textContent=R.date;el.className='fr-val set';}
+  }
+  document.getElementById('date-ov').classList.remove('open');
+}
+
+// ===== SUMMARY =====
+function showSummary(){
+  goTo('s5');
+  let tot=0,totPar=0,putts=0,fir=0,firDen=0,played=0,birdie=0,par_=0,bogey=0,dbl=0;
+  holes.forEach(h=>{
+    if(!h.shots.length)return;played++;tot+=h.shots.length;totPar+=h.par;
+    putts+=h.shots.filter(s=>s.club&&s.club.includes('パター')).length;
+    if(h.par>3){firDen++;if(h.shots[0]&&h.shots[0].land==='フェアウェイ')fir++;}
+    const d=h.shots.length-h.par;if(d<=-1)birdie++;else if(d===0)par_++;else if(d===1)bogey++;else dbl++;
+  });
+  const vs=tot-totPar;
+  document.getElementById('sum-content').innerHTML=`
+  <div class="score-strip" style="margin-bottom:16px">
+    <div><div class="score-big">${tot||'-'}</div><div style="font-size:12px;color:var(--text-2);margin-top:3px">${played}H完了 / par${totPar}</div></div>
+    <div class="score-right"><div class="score-vs" style="font-size:20px">${tot?(vs===0?'Even':vs>0?'+'+vs:vs):'-'}</div><div class="score-hint">par比</div></div>
+  </div>
+  <div class="sec-lbl">スコア内訳</div>
+  <div class="card">
+    <div class="stat-row"><span>バーディ以上</span><span class="stat-v" style="color:var(--green)">${birdie}</span></div>
+    <div class="stat-row"><span>パー</span><span class="stat-v">${par_}</span></div>
+    <div class="stat-row"><span>ボギー</span><span class="stat-v" style="color:var(--amber)">${bogey}</span></div>
+    <div class="stat-row"><span>ダブルボギー以上</span><span class="stat-v" style="color:var(--red)">${dbl}</span></div>
+  </div>
+  <div class="sec-lbl">スタッツ</div>
+  <div class="card">
+    <div class="stat-row"><span>合計パット</span><span class="stat-v">${putts}</span></div>
+    <div class="stat-row"><span>平均パット/H</span><span class="stat-v">${played?Math.round(putts/played*10)/10:'-'}</span></div>
+    <div class="stat-row"><span>FIR（フェアウェイキープ）</span><span class="stat-v">${firDen?fir+'/'+firDen:'-'}</span></div>
+  </div>
+  <div class="sec-lbl">コース情報</div>
+  <div class="card">
+    <div class="stat-row"><span>ゴルフ場</span><span class="stat-v">${R.course}</span></div>
+    <div class="stat-row"><span>日付</span><span class="stat-v">${R.date}</span></div>
+    <div class="stat-row"><span>天気</span><span class="stat-v">${R.weather}</span></div>
+    ${R.greenType?`<div class="stat-row"><span>グリーン</span><span class="stat-v">${R.greenType}</span></div>`:''}
+    ${R.goal?`<div class="stat-row" style="flex-direction:column;align-items:flex-start;gap:4px"><span>目標</span><span style="font-size:13px;color:var(--text-2);line-height:1.5">${R.goal}</span></div>`:''}
+  </div>`;
+}
+
+// ===== SERVICE WORKER =====
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});
+}
+
+// ===== INIT =====
+R.date=fmtDate(new Date());
+const dateEl=document.getElementById('r-date-v');if(dateEl)dateEl.textContent=R.date;
+DV['r-side']='OUT（1番スタート）';DV['r-hcp']='0';DV['r-weather']='晴れ';
+initHoles();
+</script>
+</body>
+</html>
