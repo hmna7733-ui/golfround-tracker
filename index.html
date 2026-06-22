@@ -949,23 +949,25 @@ function goTo(id){
   // s12からの編集でs3に戻る場合はs12に横取り
   if(id==='s3' && s12Context && s12Context._editingRoundId){
     const editId=s12Context._editingRoundId;
-    // 編集したショットを対象ラウンドに保存
     const rounds=loadRounds();
     const rIdx=rounds.findIndex(x=>x.id===editId);
     if(rIdx>=0){rounds[rIdx]={...R,holes:holes.map(h=>({...h,shots:[...h.shots]}))};saveAllRounds(rounds);}
-    // 元のR/holesを復元
     if(s12Context._prevR){R={...s12Context._prevR};holes=[...s12Context._prevHoles];curHole=s12Context._prevCurHole;}
     s12Context._editingRoundId=null;s12Context._editingHole=null;s12Context._editingShot=null;
     s12Context._prevR=null;s12Context._prevHoles=null;s12Context._prevCurHole=null;
-    // s12を再描画して遷移
     renderS12(s12Context.type,s12Context.key,s12Context.title);
     id='s12';
   }
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.screen').forEach(s=>{
+    s.classList.remove('active');
+    s.scrollTop=0; // 非表示時にもリセット
+  });
   const el=document.getElementById(id);
   if(!el)return;
   el.classList.add('active');
+  // display:noneからの切り替え後に確実にリセット
   el.scrollTop=0;
+  requestAnimationFrame(()=>{el.scrollTop=0;});
   if(id==='s0')renderHome();
   if(id==='s2')renderGrid();
   if(id==='s3')renderHole();
@@ -1173,50 +1175,80 @@ function openShotForm(idx){
   if(idx>=0 && holes[curHole].shots[idx]?.isPenalty) return;
   editShot=idx;SF={};
   const h=holes[curHole];const shotIdx=idx<0?h.shots.length:idx;
-  ['sf-club','sf-lie','sf-land','sf-dir','sf-distfeel','sf-pbreak','sf-gspd','sf-acc','sf-distr','sf-impact'].forEach(k=>{const e=document.getElementById(k+'-v');if(e){e.textContent='選択';e.className='fr-val';}});
-  const dv=document.getElementById('sf-dist-v');if(dv){dv.textContent='-';dv.className='fr-val';}
+
+  // ① DV（ドラムキャッシュ）を全クリア → ドラムが必ず先頭から始まる
+  ['sf-club','sf-lie','sf-land','sf-dir','sf-distfeel','sf-pbreak','sf-gspd',
+   'sf-acc','sf-distr','sf-impact','sf-stype','sf-shape','sf-wind','sf-slope'].forEach(k=>{DV[k]='';});
+  DV['sf-dist']='-';
+
+  // ② 表示欄を全リセット
+  ['sf-club','sf-lie','sf-land','sf-dir','sf-distfeel','sf-pbreak','sf-gspd','sf-acc','sf-distr','sf-impact'].forEach(k=>{
+    const e=document.getElementById(k+'-v');if(e){e.textContent='選択';e.className='fr-val';}
+  });
+  // パット専用評価欄もリセット
+  ['sf-acc-putt-v','sf-impact-putt-v'].forEach(id=>{
+    const e=document.getElementById(id);if(e){e.textContent='-';e.className='fr-val';}
+  });
+  const distEl=document.getElementById('sf-dist-v');if(distEl){distEl.textContent='-';distEl.className='fr-val';}
   document.getElementById('sf-note').value='';
   document.getElementById('sf-hitdist-v').textContent='次打の残距離から計算';
+
+  // ③ デフォルト値をセット
   function sd(id,val){const e=document.getElementById(id);if(e){e.textContent=val;if(e.classList.contains('fr-val'))e.className='fr-val set';}}
   sd('sf-stype-v','フルショット');SF.stype='フルショット';
   sd('sf-shape-v','ストレート');SF.shape='ストレート';
   sd('sf-wind-v','無風');SF.wind='無風';
   sd('sf-slope-v','フラット');SF.slope='フラット';
   const lieD=getLieDefault(h,shotIdx);if(lieD){sd('sf-lie-v',lieD);SF.lie=lieD;}
-  // 新規追加時：クラブのデフォルト設定
+
+  // ④ 番手のデフォルト（新規追加時のみパター引き継ぎを条件付きで適用）
   if(idx<0){
     let prevReal=null;
     for(let i=shotIdx-1;i>=0;i--){if(!h.shots[i].isPenalty){prevReal=h.shots[i];break;}}
     if(prevReal){
-      // 直前がパターで、かつカップインでない → 引き続きパター
       if(prevReal.club&&prevReal.club.includes('パター')&&!prevReal.cupIn){
+        // 直前がパター継続中
         sd('sf-club-v','パター');SF.club='パター';
-        updatePuttSection();
-      }
-      // 直前の着弾がグリーンオン → パター
-      else if(prevReal.land==='グリーン（オン）'){
+        DV['sf-club']='パター';
+      } else if(prevReal.land==='グリーン（オン）'){
+        // グリーンオン → パター
         sd('sf-club-v','パター');SF.club='パター';
-        updatePuttSection();
+        DV['sf-club']='パター';
       }
+      // それ以外は番手未選択のまま（一番上から選ぶ）
     }
+    // prevRealがない（1打目）も番手未選択
   }
+
+  // ⑤ 編集時：既存データを復元
   if(idx>=0){
     const s=h.shots[idx];Object.assign(SF,s);
-    if(s.club)sd('sf-club-v',s.club);
-    if(s.stype)sd('sf-stype-v',s.stype);if(s.shape)sd('sf-shape-v',s.shape);if(s.wind)sd('sf-wind-v',s.wind);
-    if(s.lie)sd('sf-lie-v',s.lie);if(s.slope)sd('sf-slope-v',s.slope);
-    if(s.land)sd('sf-land-v',s.land);if(s.dir)sd('sf-dir-v',s.dir);if(s.distfeel)sd('sf-distfeel-v',s.distfeel);
-    if(s.dist){const u=s.dist_unit||'y';sd('sf-dist-v',s.dist+u);}
-    if(s.pbreak)sd('sf-pbreak-v',s.pbreak);if(s.gspd)sd('sf-gspd-v',s.gspd);
-    if(s.acc)sd('sf-acc-v',s.acc);if(s.distr)sd('sf-distr-v',s.distr);if(s.impact)sd('sf-impact-v',s.impact);
-    // パット評価欄も同期
-    const paccEl=document.getElementById('sf-acc-putt-v');if(paccEl&&s.acc){paccEl.textContent=s.acc;paccEl.className='fr-val set';}
-    const pimpEl=document.getElementById('sf-impact-putt-v');if(pimpEl&&s.impact){pimpEl.textContent=s.impact;pimpEl.className='fr-val set';}
+    if(s.club){sd('sf-club-v',s.club);DV['sf-club']=s.club;}
+    if(s.stype){sd('sf-stype-v',s.stype);DV['sf-stype']=s.stype;}
+    if(s.shape){sd('sf-shape-v',s.shape);DV['sf-shape']=s.shape;}
+    if(s.wind){sd('sf-wind-v',s.wind);DV['sf-wind']=s.wind;}
+    if(s.lie){sd('sf-lie-v',s.lie);DV['sf-lie']=s.lie;}
+    if(s.slope){sd('sf-slope-v',s.slope);DV['sf-slope']=s.slope;}
+    if(s.land){sd('sf-land-v',s.land);DV['sf-land']=s.land;}
+    if(s.dir){sd('sf-dir-v',s.dir);DV['sf-dir']=s.dir;}
+    if(s.distfeel){sd('sf-distfeel-v',s.distfeel);DV['sf-distfeel']=s.distfeel;}
+    if(s.dist){const u=s.dist_unit||'y';sd('sf-dist-v',s.dist+u);DV['sf-dist']=s.dist+u;}
+    if(s.pbreak){sd('sf-pbreak-v',s.pbreak);DV['sf-pbreak']=s.pbreak;}
+    if(s.gspd){sd('sf-gspd-v',s.gspd);DV['sf-gspd']=s.gspd;}
+    if(s.acc){sd('sf-acc-v',s.acc);DV['sf-acc']=s.acc;
+      const pa=document.getElementById('sf-acc-putt-v');if(pa){pa.textContent=s.acc;pa.className='fr-val set';}}
+    if(s.distr){sd('sf-distr-v',s.distr);DV['sf-distr']=s.distr;}
+    if(s.impact){sd('sf-impact-v',s.impact);DV['sf-impact']=s.impact;
+      const pi=document.getElementById('sf-impact-putt-v');if(pi){pi.textContent=s.impact;pi.className='fr-val set';}}
     document.getElementById('sf-note').value=s.note||'';
     if(s.hitdist)document.getElementById('sf-hitdist-v').textContent=s.hitdist+'y（計算済み）';
   }
+
   document.getElementById('sf-title').textContent=idx<0?`${h.shots.length+1}打目`:`${idx+1}打目を編集`;
-  updatePuttSection();switchTab(0,document.querySelector('.tab'));goTo('s4');
+  // ⑥ 最後にパット判定して表示切り替え
+  updatePuttSection();
+  switchTab(0,document.querySelector('.tab'));
+  goTo('s4');
 }
 
 // 着弾地点から罰打数を返す（0=ペナなし）
@@ -1256,7 +1288,10 @@ function saveShot(){
   goTo('s3');
 }
 function switchTab(i,el){
-  document.querySelectorAll('.tab-pane').forEach((p,j)=>p.classList.toggle('active',j===i));
+  document.querySelectorAll('.tab-pane').forEach((p,j)=>{
+    p.classList.toggle('active',j===i);
+    p.scrollTop=0; // タブ切り替え時もリセット
+  });
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   if(el)el.classList.add('active');else document.querySelectorAll('.tab')[i]?.classList.add('active');
 }
@@ -1331,6 +1366,7 @@ function closeDrum(save){
     if(drumKey==='sf-club'){updatePuttSection();DV['sf-dist']='-';SF.dist=null;const dv=document.getElementById('sf-dist-v');if(dv){dv.textContent='-';dv.className='fr-val';}}
   }
   document.getElementById('drum-ov').classList.remove('open');
+  document.getElementById('drum-ov').scrollTop=0;
 }
 function openGreenDrum(){
   const sc=document.getElementById('green-sc');const items=greenTypes.map(it=>it.v);
@@ -1677,13 +1713,34 @@ function renderAnalysis(){
   allShots.forEach(s=>{if(s.miss&&s.miss!=='ミスなし')missCount[s.miss]=(missCount[s.miss]||0)+1;});
   const missRank=Object.entries(missCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
-  // インパクト感の集計（新）
+  // インパクト感集計（パター除外）
   const impactCount={};
-  allShots.forEach(s=>{if(s.impact&&!s.impact.startsWith('◎')&&!s.impact.startsWith('○'))impactCount[s.impact]=(impactCount[s.impact]||0)+1;});
+  allShots.filter(s=>!(s.club&&s.club.includes('パター'))).forEach(s=>{
+    if(s.impact&&!s.impact.startsWith('◎')&&!s.impact.startsWith('○'))
+      impactCount[s.impact]=(impactCount[s.impact]||0)+1;
+  });
   const impactBadRank=Object.entries(impactCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  // トップ・ダフリ・シャンク・チーピン の深刻度チェック
   const seriousMiss=['× トップ','× ダフリ','× シャンク','× チーピン'];
-  const seriousCount=allShots.filter(s=>s.impact&&seriousMiss.some(m=>s.impact.startsWith(m))).length;
+  const seriousCount=allShots.filter(s=>
+    !(s.club&&s.club.includes('パター'))&&
+    s.impact&&seriousMiss.some(m=>s.impact.startsWith(m))
+  ).length;
+
+  // パットのタッチ集計（別枠）
+  const puttTouchCount={ジャスト:0,'ショート（弱め）':0,'オーバー（強め）':0};
+  const puttEvalCount={'◎':0,'○':0,'△':0,'×':0};
+  puttShots.forEach(s=>{
+    if(s.impact&&puttTouchCount[s.impact]!==undefined) puttTouchCount[s.impact]++;
+    if(s.acc){
+      if(s.acc.startsWith('◎'))puttEvalCount['◎']++;
+      else if(s.acc.startsWith('○'))puttEvalCount['○']++;
+      else if(s.acc.startsWith('△'))puttEvalCount['△']++;
+      else if(s.acc.startsWith('×'))puttEvalCount['×']++;
+    }
+  });
+  const puttTouchTotal=Object.values(puttTouchCount).reduce((a,b)=>a+b,0);
+  const shortRate=puttTouchTotal?Math.round(puttTouchCount['ショート（弱め）']/puttTouchTotal*100):0;
+  const overRate=puttTouchTotal?Math.round(puttTouchCount['オーバー（強め）']/puttTouchTotal*100):0;
 
   // 方向ずれ傾向
   const dirCount={};
@@ -1958,6 +2015,39 @@ function renderAnalysis(){
     });
   }
 
+  // パットのタッチ傾向をinsightに追加
+  if(puttTouchTotal>=5){
+    const dominantTouch=shortRate>overRate?'ショート':overRate>shortRate?'オーバー':null;
+    if(dominantTouch&&Math.max(shortRate,overRate)>=40){
+      insights.push({
+        score:Math.max(shortRate,overRate)*0.02,
+        priority:Math.max(shortRate,overRate)>=55?'A':'B',
+        filterKey:'putt',
+        title:`パットが${dominantTouch}傾向（${Math.max(shortRate,overRate)}%）`,
+        body:`${puttTouchTotal}打中、ショート${puttTouchCount['ショート（弱め）']}回(${shortRate}%)・ジャスト${puttTouchCount['ジャスト']}回・オーバー${puttTouchCount['オーバー（強め）']}回(${overRate}%)。${dominantTouch==='ショート'?'打ち切れていない場面が多い傾向です。':'強めに打ちすぎている場面が多い傾向です。'}`,
+        point:dominantTouch==='ショート'
+          ?'「カップの奥に落とす」イメージで打ちましょう。グリーンの速さに慣れるため、ラウンド前の練習グリーンで距離感を確認してください。'
+          :'バックストロークを小さく抑える意識を。「止める」より「転がす」イメージで振り幅を一定にしましょう。'
+      });
+    }
+  }
+
+  // パット総合評価の傾向
+  if(puttShots.length>=5){
+    const puttGoodRate=puttShots.length?Math.round((puttEvalCount['◎']+puttEvalCount['○'])/puttShots.length*100):0;
+    const puttBadRate=puttShots.length?Math.round((puttEvalCount['△']+puttEvalCount['×'])/puttShots.length*100):0;
+    if(puttBadRate>=50&&!insights.find(i=>i.filterKey==='putt'&&i.title.includes('タッチ'))){
+      insights.push({
+        score:puttBadRate*0.015,
+        priority:puttBadRate>=65?'A':'B',
+        filterKey:'putt',
+        title:`パットの精度が低い（寄せられていない${puttBadRate}%）`,
+        body:`パット${puttShots.length}打のうち「普通・悪い」評価が${puttBadRate}%。カップから1m以上外れるケースが多い状況です。`,
+        point:'ショートパット（1m以内）を確実に入れることが最優先。距離感よりまず方向性の安定から練習しましょう。'
+      });
+    }
+  }
+
   // 13. インパクト感：深刻ミスの頻度
   if(seriousCount>=3){
     const rate=Math.round(seriousCount/allShots.length*100);
@@ -2096,7 +2186,14 @@ function renderAnalysis(){
     ${missHtml?`<div class="sec-lbl">多かったミスショット TOP5</div>
     <div class="card" style="padding:8px 16px">${missHtml}</div>`:''}
 
-    ${impactBadRank.length?`<div class="sec-lbl">インパクトミスの内訳</div>
+    ${puttTouchTotal>=3?`<div class="sec-lbl">パットのタッチ内訳</div>
+    <div class="card" style="padding:8px 16px">
+      <div class="trend-row"><div style="font-size:13px;flex:1">ジャスト</div><div style="font-weight:700;color:var(--green)">${puttTouchCount['ジャスト']}回</div><div style="font-size:12px;color:var(--text-2);margin-left:8px">${puttTouchTotal?Math.round(puttTouchCount['ジャスト']/puttTouchTotal*100):0}%</div></div>
+      <div class="trend-row"><div style="font-size:13px;flex:1">ショート（弱め）</div><div style="font-weight:700;color:var(--amber)">${puttTouchCount['ショート（弱め）']}回</div><div style="font-size:12px;color:var(--text-2);margin-left:8px">${shortRate}%</div></div>
+      <div class="trend-row"><div style="font-size:13px;flex:1">オーバー（強め）</div><div style="font-weight:700;color:var(--red)">${puttTouchCount['オーバー（強め）']}回</div><div style="font-size:12px;color:var(--text-2);margin-left:8px">${overRate}%</div></div>
+    </div>`:''}
+
+    ${impactBadRank.length?`<div class="sec-lbl">インパクトミスの内訳（パター除く）</div>
     <div class="card" style="padding:8px 16px">${impactBadRank.map(([imp,cnt],i)=>{
       const cols=['var(--red)','var(--red)','var(--amber)','var(--amber)','var(--text-2)'];
       return`<div class="trend-row"><div style="font-size:12px;color:var(--text-3);width:16px">${i+1}</div><div style="flex:1">${imp}</div><div style="font-weight:700;color:${cols[i]}">${cnt}回</div></div>`;
@@ -2468,7 +2565,7 @@ function renderS12(type,key,title){
         if(s.isPenalty)return;
         // フィルタリング
         let match=false;
-        if(type==='club') match=(s.club===key);
+        if(type==='club') match=s.club&&(s.club===key||s.club.startsWith(key+'（')||s.club.startsWith(key+'('));
         else if(type==='insight'){
           if(key==='putt') match=s.club&&s.club.includes('パター');
           else if(key==='teeshot') match=si===0&&h.par>=4;
@@ -2488,7 +2585,8 @@ function renderS12(type,key,title){
 
   const rows=shotItems.map(({r,h,si,s,dispNum})=>{
     const clubShort=(s.club||'-').replace(/（.*?）/,'');
-    const missColor=s.impact&&s.impact.startsWith('×')?'color:var(--red)':'';
+    const isPuttShot=s.club&&s.club.includes('パター');
+    const missColor=!isPuttShot&&s.impact&&s.impact.startsWith('×')?'color:var(--red)':'';
     const accBadge=s.acc?`<span style="font-size:11px;color:var(--text-3)">${s.acc.slice(0,2)}</span>`:'';
     const distStr=s.dist?`残${s.dist}${s.dist_unit||'y'}`:'';
     const hitStr=s.hitdist?`打${s.hitdist}y`:'';
