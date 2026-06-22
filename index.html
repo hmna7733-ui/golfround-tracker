@@ -321,6 +321,16 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     </div>
     <div id="home-list"></div>
   </div>
+  <!-- 再読み込みボタン（右下固定） -->
+  <button onclick="location.reload(true)" style="
+    position:fixed;bottom:calc(var(--safe-bot) + 20px);right:20px;
+    width:48px;height:48px;border-radius:50%;
+    background:var(--card);border:0.5px solid var(--border);
+    box-shadow:0 2px 12px rgba(0,0,0,0.12);
+    font-size:20px;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    transition:opacity 0.1s;z-index:30;
+  " id="reload-btn" ontouchstart="this.style.opacity=0.6" ontouchend="this.style.opacity=1">🔄</button>
 </div>
 
 <!-- SETUP -->
