@@ -2625,7 +2625,14 @@ function editShotFromS12(roundId,holeIdx,shotIdx){
 
 // saveShot後にs12用の後処理をhook
 // SERVICE WORKER
-if('serviceWorker' in navigator){window.addEventListener('load',()=>{navigator.serviceWorker.register('./sw.js').catch(()=>{});});}
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      // 登録済みの場合も毎回最新チェック
+      reg.update();
+    }).catch(()=>{});
+  });
+}
 
 // INIT
 R.date=fmtDate(new Date());
