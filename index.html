@@ -437,7 +437,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <div class="card">
       <div class="fr" onclick="openDrum('番手',null,getActiveClubs(),'sf-club')"><span class="fr-lbl">クラブ</span><span class="fr-val" id="sf-club-v">選択</span><span class="fr-arr">›</span></div>
       <div class="fr" id="row-stype" onclick="openDrum('ショット種類',null,shotTypes,'sf-stype')"><span class="fr-lbl">ショット種類</span><span class="fr-val set" id="sf-stype-v">フルショット</span><span class="fr-arr">›</span></div>
-      <div class="fr" id="row-shape" onclick="openDrum('意図した球筋',null,shotShapes,'sf-shape')"><span class="fr-lbl">意図した球筋</span><span class="fr-val set" id="sf-shape-v">ストレート</span><span class="fr-arr">›</span></div>
+      <div class="fr" id="row-shape" onclick="openDrum('意図した球筋',null,getShotShapes(),'sf-shape')"><span class="fr-lbl">意図した球筋</span><span class="fr-val set" id="sf-shape-v">ストレート</span><span class="fr-arr">›</span></div>
     </div>
     <div class="sf-sec-lbl">距離</div>
     <div class="card">
@@ -722,7 +722,11 @@ const bodyList=['絶好調','良好','普通','やや不調','不調'];
 const hcpList=Array.from({length:37},(_,i)=>(i*0.5)+'');
 const clubs=['1W（ドライバー）','3W','5W','UT（ユーティリティ）','3I','4I','5I','6I','7I','8I','9I','PW（Pウェッジ）','AW（Aウェッジ）','SW（Sウェッジ）','LW（Lウェッジ）','パター'];
 const shotTypes=['フルショット','3/4スイング','1/2スイング','バンカーショット','アプローチ','ランニングアプローチ','パット'];
-const shotShapes=['ストレート','ドロー（右→左）','フェード（左→右）','ハイボール','ローボール','スピン系'];
+const shotShapesRight=['ストレート','ドロー（右→左）','フェード（左→右）','ハイボール','ローボール','スピン系'];
+const shotShapesLeft=['ストレート','ドロー（左→右）','フェード（右→左）','ハイボール','ローボール','スピン系'];
+function getShotShapes(){const p=loadProfile();return(p&&p.hand==='left')?shotShapesLeft:shotShapesRight;}
+// 後方互換のためshotShapesも残す（分析で参照される場合）
+const shotShapes=shotShapesRight;
 const windDirs=['無風','向かい風','追い風','左から','右から','左斜め向かい','右斜め向かい','左斜め追い','右斜め追い'];
 const lies=['フェアウェイ','ラフ（薄め）','ラフ（深め）','ティーグラウンド','バンカー（砂の上）','グリーン','フリンジ（エッジ）','カラー（グリーン周辺）','ベアグラウンド（土）','ディボット跡'];
 const slopes=['フラット','つま先上がり','つま先下がり','左足上がり','左足下がり'];
@@ -1949,12 +1953,27 @@ function renderAnalysis(){
 
   // 9. プロフィール活用：持ち球と実際のミス方向の整合チェック
   if(prof.ballFlight&&totalDir>=10){
+    const isLeft=prof.hand==='left';
     const isDrawPlayer=prof.ballFlight==='draw'||prof.ballFlight==='hook';
     const isFadePlayer=prof.ballFlight==='fade'||prof.ballFlight==='slice';
-    if(isDrawPlayer&&rightMiss>leftMiss*1.5){
-      insights.push({score:0.15,priority:'B',title:'持ち球と逆方向のミスが多い',body:`持ち球はドロー系ですが、ミスが右方向（${Math.round(rightMiss/(totalDir)*100)}%）に偏っています。スウィング軌道がアウトサイドインに変わっている可能性があります。`,point:'グリップとアドレスを確認。インサイドアウトの軌道に戻すドリルを行いましょう。'});
-    }else if(isFadePlayer&&leftMiss>rightMiss*1.5){
-      insights.push({score:0.15,priority:'B',title:'持ち球と逆方向のミスが多い',body:`持ち球はフェード系ですが、ミスが左方向（${Math.round(leftMiss/(totalDir)*100)}%）に偏っています。インサイドアウトになっている可能性があります。`,point:'フォロースルーで左肘が引けていないか確認。フィニッシュを高く保つ意識を。'});
+    // 右打ち：ドロー＝右→左（左ミスが自然）、フェード＝左→右（右ミスが自然）
+    // 左打ち：ドロー＝左→右（右ミスが自然）、フェード＝右→左（左ミスが自然）
+    const drawNaturalMiss=isLeft?rightMiss:leftMiss;
+    const drawOppMiss=isLeft?leftMiss:rightMiss;
+    const fadeNaturalMiss=isLeft?leftMiss:rightMiss;
+    const fadeOppMiss=isLeft?rightMiss:leftMiss;
+    if(isDrawPlayer&&drawOppMiss>drawNaturalMiss*1.5){
+      const oppDir=isLeft?'左':'右';
+      const oppRate=Math.round(drawOppMiss/totalDir*100);
+      insights.push({score:0.15,priority:'B',filterKey:'direction',title:'持ち球と逆方向のミスが多い',
+        body:`持ち球はドロー系ですが、ミスが${oppDir}方向（${oppRate}%）に偏っています。スウィング軌道が${isLeft?'インサイドアウト':'アウトサイドイン'}に変わっている可能性があります。`,
+        point:isLeft?'フォロースルーで右肘が引けていないか確認。フィニッシュを高く保つ意識を。':'グリップとアドレスを確認。インサイドアウトの軌道に戻すドリルを行いましょう。'});
+    }else if(isFadePlayer&&fadeOppMiss>fadeNaturalMiss*1.5){
+      const oppDir=isLeft?'右':'左';
+      const oppRate=Math.round(fadeOppMiss/totalDir*100);
+      insights.push({score:0.15,priority:'B',filterKey:'direction',title:'持ち球と逆方向のミスが多い',
+        body:`持ち球はフェード系ですが、ミスが${oppDir}方向（${oppRate}%）に偏っています。${isLeft?'アウトサイドイン':'インサイドアウト'}になっている可能性があります。`,
+        point:isLeft?'グリップとアドレスを確認。アウトサイドインの軌道に戻すドリルを行いましょう。':'フォロースルーで左肘が引けていないか確認。フィニッシュを高く保つ意識を。'});
     }
   }
 
@@ -2249,16 +2268,21 @@ function renderAnalysis(){
 // 共有コード生成（全ラウンドデータをBase64圧縮）
 function openShareModal(){
   const rounds=loadRounds();
-  if(!rounds.length){
-    alert('共有するラウンドデータがありません。');return;
-  }
+  if(!rounds.length){alert('共有するラウンドデータがありません。');return;}
   const payload={v:1,name:rounds[0]?.course||'ゴルフデータ',rounds};
-  const json=JSON.stringify(payload);
-  // Base64エンコード（UTF-8対応）
-  const code='GOLF1:'+btoa(unescape(encodeURIComponent(json)));
-  document.getElementById('share-code-area').value=code;
-  document.getElementById('copy-btn').textContent='コードをコピー';
-  document.getElementById('share-modal').classList.add('open');
+  try{
+    const json=JSON.stringify(payload);
+    // TextEncoderでUTF-8→Uint8Array→Base64（日本語対応）
+    const bytes=new TextEncoder().encode(json);
+    let binary='';
+    bytes.forEach(b=>binary+=String.fromCharCode(b));
+    const code='GOLF1:'+btoa(binary);
+    document.getElementById('share-code-area').value=code;
+    document.getElementById('copy-btn').textContent='コードをコピー';
+    document.getElementById('share-modal').classList.add('open');
+  }catch(e){
+    alert('データの生成に失敗しました。データ量が多すぎる可能性があります。');
+  }
 }
 
 function copyShareCode(){
@@ -2292,7 +2316,10 @@ function importData(){
   errEl.style.display='none';
   try{
     if(!raw.startsWith('GOLF1:'))throw new Error('invalid');
-    const json=decodeURIComponent(escape(atob(raw.slice(6))));
+    const binary=atob(raw.slice(6));
+    const bytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
+    const json=new TextDecoder().decode(bytes);
     const payload=JSON.parse(json);
     if(!payload.rounds||!Array.isArray(payload.rounds))throw new Error('invalid');
     closeImportModal();
@@ -2415,12 +2442,15 @@ function renderProfilePage(){
 
   const clubRows=clubs.map((c,i)=>{
     const isPT=c.id==='PT';
-    return`<div class="club-setting-row">
+    return`<div class="club-setting-row" id="club-row-${i}">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
         <div style="font-size:13px;font-weight:700;color:var(--text)">${c.id}</div>
-        <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);cursor:pointer">
-          <input type="checkbox" id="cu_${i}" ${c.use===false?'':'checked'} style="width:16px;height:16px;accent-color:var(--green)">使用する
-        </label>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);cursor:pointer">
+            <input type="checkbox" id="cu_${i}" ${c.use===false?'':'checked'} style="width:16px;height:16px;accent-color:var(--green)">使用する
+          </label>
+          <button onclick="deleteClubRow(${i})" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:2px 4px;line-height:1" title="削除">×</button>
+        </div>
       </div>
       <div style="display:flex;gap:6px;align-items:center;margin-bottom:${isPT?'0':'6px'}">
         <input class="club-input" placeholder="クラブ名" value="${c.name||''}" id="cn_${i}" style="flex:3;min-width:0">
@@ -2469,6 +2499,7 @@ function renderProfilePage(){
     <div class="sec-lbl">スウィング情報</div>
     <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
       <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">持ち球（自然に出る球筋）</label>
+        <div style="font-size:11px;color:var(--text-3);margin-bottom:6px">${(p.hand==='left')?'左打ち：ドロー＝左→右、フェード＝右→左':'右打ち：ドロー＝右→左、フェード＝左→右'}</div>
         <div class="chip-sel-group">
           <button class="chip-sel ${p.ballFlight==='draw'?'active':''}" onclick="selChipPro(this,'ball-flight','draw')">ドロー</button>
           <button class="chip-sel ${p.ballFlight==='fade'?'active':''}" onclick="selChipPro(this,'ball-flight','fade')">フェード</button>
@@ -2501,9 +2532,10 @@ function renderProfilePage(){
 
     <div class="sec-lbl">クラブ設定（名前・フル/3/4/1/2キャリーを入力）</div>
     <div style="font-size:12px;color:var(--text-2);padding:0 4px 8px;line-height:1.5">「使う」チェックを外すと入力に出てきません。各スウィングのキャリーを入れると分析精度が上がります。</div>
-    <div class="card" style="padding:4px 16px">
+    <div class="card" style="padding:4px 16px" id="club-list-card">
       ${clubRows}
     </div>
+    <button onclick="addClubRow()" class="btn btn-secondary" style="margin-top:8px;font-size:14px;padding:12px">＋ クラブを追加</button>
     <div style="height:calc(var(--safe-bot,0px)+24px)"></div>
   `;
   // chip選択状態を内部変数に保持
@@ -2535,7 +2567,84 @@ function toggleWeakness(el,val){
   else{window._profileTemp.weaknesses.push(val);el.classList.add('active');}
 }
 
+// クラブ行の現在の入力値をtmpに保存してから再描画
+function syncClubsFromDOM(){
+  const tmp=window._profileTemp||{};
+  const clubs=tmp.clubs||[];
+  clubs.forEach((c,i)=>{
+    const nm=document.getElementById('cn_'+i);if(nm)c.name=nm.value;
+    const cc=document.getElementById('cc_'+i);if(cc)c.carry=cc.value;
+    const c3=document.getElementById('c3q_'+i);if(c3)c.carry3q=c3.value;
+    const c1=document.getElementById('c12_'+i);if(c1)c.carry12=c1.value;
+    const cu=document.getElementById('cu_'+i);if(cu)c.use=cu.checked;
+  });
+  tmp.clubs=clubs;
+  window._profileTemp=tmp;
+}
+
+function addClubRow(){
+  syncClubsFromDOM();
+  const tmp=window._profileTemp||{};
+  if(!tmp.clubs)tmp.clubs=[];
+  const newId='C'+(Date.now()%10000);
+  tmp.clubs.push({id:newId,name:'',carry:'',carry3q:'',carry12:'',use:true});
+  window._profileTemp=tmp;
+  // クラブリスト部分だけ再描画
+  reRenderClubList(tmp.clubs);
+  // 最下部にスクロール
+  setTimeout(()=>{const el=document.getElementById('s11');if(el)el.scrollTop=el.scrollHeight;},50);
+}
+
+function deleteClubRow(idx){
+  syncClubsFromDOM();
+  const tmp=window._profileTemp||{};
+  if(!tmp.clubs||!tmp.clubs[idx])return;
+  if(!confirm(`「${tmp.clubs[idx].name||'このクラブ'}」を削除しますか？`))return;
+  tmp.clubs.splice(idx,1);
+  window._profileTemp=tmp;
+  reRenderClubList(tmp.clubs);
+}
+
+function reRenderClubList(clubs){
+  const card=document.getElementById('club-list-card');
+  if(!card)return;
+  const rows=clubs.map((c,i)=>{
+    const isPT=c.id==='PT';
+    return`<div class="club-setting-row" id="club-row-${i}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${c.id}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);cursor:pointer">
+            <input type="checkbox" id="cu_${i}" ${c.use===false?'':'checked'} style="width:16px;height:16px;accent-color:var(--green)">使用する
+          </label>
+          <button onclick="deleteClubRow(${i})" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:2px 4px;line-height:1">×</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:${isPT?'0':'6px'}">
+        <input class="club-input" placeholder="クラブ名" value="${c.name||''}" id="cn_${i}" style="flex:3;min-width:0">
+        <div style="flex:1;min-width:52px;max-width:72px;position:relative">
+          <input class="club-input" placeholder="フル" value="${c.carry||''}" id="cc_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+      </div>
+      ${isPT?'':`<div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11px;color:var(--text-3);width:56px;text-align:right;flex-shrink:0">3/4 swing</span>
+        <div style="flex:1;position:relative">
+          <input class="club-input" placeholder="3/4" value="${c.carry3q||''}" id="c3q_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+        <div style="flex:1;position:relative">
+          <input class="club-input" placeholder="1/2" value="${c.carry12||''}" id="c12_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+      </div>`}
+    </div>`;
+  }).join('');
+  card.innerHTML=rows;
+}
+
 function saveProfile(){
+  syncClubsFromDOM(); // DOM上の最新入力値をtmpに反映
   const tmp=window._profileTemp||{};
   const p=loadProfile()||{};
   // 基本情報
