@@ -678,7 +678,8 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <div id="share-round-list" style="text-align:left;max-height:260px;overflow-y:auto;border:0.5px solid var(--border);border-radius:10px;margin-bottom:8px"></div>
     <div id="share-link-wrap" style="display:none;margin-bottom:8px">
       <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">👇 このリンクをLINEやメッセージで送ってください</div>
-      <input id="share-link-input" readonly style="width:100%;border:0.5px solid var(--green);border-radius:10px;padding:10px 12px;font-size:12px;background:var(--green-lt);color:var(--green-dk);outline:none;font-family:monospace;word-break:break-all">
+      <div id="share-link-copied" style="display:none;background:var(--green-lt);border-radius:10px;padding:14px;text-align:center;color:var(--green-dk);font-weight:500;font-size:14px">✓ リンクをコピーしました！<br><span style="font-size:12px;font-weight:400;opacity:0.8;margin-top:4px;display:block">LINEやメッセージに貼り付けて送ってください</span></div>
+      <input id="share-link-input" readonly style="width:100%;border:0.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;background:var(--bg);color:var(--text-3);outline:none;font-family:monospace;word-break:break-all;display:block">
       <button class="modal-btn primary" onclick="copyShareLink()" id="copy-link-btn" style="margin-top:8px">🔗 リンクをコピー</button>
     </div>
     <button class="modal-btn secondary" onclick="closeShareModal()">閉じる</button>
@@ -2296,6 +2297,13 @@ function generateShareLink(roundId){
   const rounds=loadRounds();
   const r=rounds.find(x=>x.id===roundId);
   if(!r)return;
+  // コピー済み表示をリセット
+  const copiedMsg=document.getElementById('share-link-copied');
+  const btn=document.getElementById('copy-link-btn');
+  const input=document.getElementById('share-link-input');
+  if(copiedMsg)copiedMsg.style.display='none';
+  if(btn)btn.style.display='block';
+  if(input)input.style.display='block';
   try{
     const json=JSON.stringify(r);
     const bytes=new TextEncoder().encode(json);
@@ -2316,21 +2324,23 @@ function generateShareLink(roundId){
 function copyShareLink(){
   const input=document.getElementById('share-link-input');
   const btn=document.getElementById('copy-link-btn');
+  const copiedMsg=document.getElementById('share-link-copied');
   const url=input.value;
+  const onCopied=()=>{
+    input.style.display='none';
+    btn.style.display='none';
+    copiedMsg.style.display='block';
+  };
   if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(url).then(()=>{
-      btn.textContent='✓ コピーしました！';
-      setTimeout(()=>btn.textContent='🔗 リンクをコピー',2500);
-    }).catch(()=>fallbackCopyLink(input,btn));
+    navigator.clipboard.writeText(url).then(onCopied).catch(()=>{fallbackCopyLink(input);onCopied();});
   }else{
-    fallbackCopyLink(input,btn);
+    fallbackCopyLink(input);onCopied();
   }
 }
-function fallbackCopyLink(input,btn){
+function fallbackCopyLink(input){
+  input.style.display='block';
   input.select();input.setSelectionRange(0,99999);
   document.execCommand('copy');
-  btn.textContent='✓ コピーしました！';
-  setTimeout(()=>btn.textContent='🔗 リンクをコピー',2500);
 }
 
 function closeShareModal(){document.getElementById('share-modal').classList.remove('open');}
@@ -2834,14 +2844,12 @@ initHoles();
 updateClubsFromProfile();
 
 // URLパラメータ ?r= があれば共有データとして閲覧画面を開く
-// DOMContentLoaded後に実行することで確実にDOM操作できる
-document.addEventListener('DOMContentLoaded', function(){
+// 共有URLパラメータ処理（確実に動作させるため関数化）
+function checkSharedUrl(){
   try{
     const params=new URLSearchParams(location.search);
     const rParam=params.get('r');
-    if(!rParam)return;
-    // デコード
-    // URLセーフBase64を通常のBase64に戻す（-→+ _→/ パディング追加）
+    if(!rParam)return false;
     const b64=rParam.replace(/-/g,'+').replace(/_/g,'/');
     const padded=b64+('=='.slice(0,(4-b64.length%4)%4));
     const binary=atob(padded);
@@ -2850,13 +2858,22 @@ document.addEventListener('DOMContentLoaded', function(){
     const round=JSON.parse(new TextDecoder().decode(bytes));
     if(round&&round.id){
       history.replaceState(null,'',location.pathname);
-      // 少し遅延させてINIT処理が全て完了してから開く
-      setTimeout(()=>openViewer({rounds:[round]}), 100);
+      openViewer({rounds:[round]});
+      return true;
     }
   }catch(e){
-    console.warn('共有URLの処理失敗:', e.message);
+    console.warn('共有URL処理失敗:', e.message);
   }
+  return false;
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+  setTimeout(checkSharedUrl, 150);
 });
+// DOMContentLoadedが既に発火済みの場合のフォールバック
+if(document.readyState==='complete'||document.readyState==='interactive'){
+  setTimeout(checkSharedUrl, 200);
+}
 </script>
 </body>
 </html>
