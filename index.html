@@ -2327,17 +2327,24 @@ function generateShareCode(roundId){
 
 function copyShareCode(){
   const area=document.getElementById('share-code-area');
-  area.select();
-  try{
-    navigator.clipboard.writeText(area.value).then(()=>{
-      document.getElementById('copy-btn').textContent='✓ コピーしました！';
-      setTimeout(()=>document.getElementById('copy-btn').textContent='コードをコピー',2000);
-    });
-  }catch(e){
-    document.execCommand('copy');
-    document.getElementById('copy-btn').textContent='✓ コピーしました！';
-    setTimeout(()=>document.getElementById('copy-btn').textContent='コードをコピー',2000);
+  const code=area.value.trim();
+  const btn=document.getElementById('copy-btn');
+  // clipboard APIを試みる（モダンブラウザ）
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(code).then(()=>{
+      btn.textContent='✓ コピーしました！';
+      setTimeout(()=>btn.textContent='コードをコピー',2500);
+    }).catch(()=>fallbackCopy(area,btn));
+  }else{
+    fallbackCopy(area,btn);
   }
+}
+function fallbackCopy(area,btn){
+  area.select();
+  area.setSelectionRange(0,99999);
+  document.execCommand('copy');
+  btn.textContent='✓ コピーしました！';
+  setTimeout(()=>btn.textContent='コードをコピー',2500);
 }
 
 function closeShareModal(){document.getElementById('share-modal').classList.remove('open');}
@@ -2351,28 +2358,29 @@ function openImportModal(){
 function closeImportModal(){document.getElementById('import-modal').classList.remove('open');}
 
 function importData(){
-  const raw=document.getElementById('import-code-area').value.trim();
+  // 貼り付けたコードから空白・改行・全角スペースを全て除去
+  const raw=document.getElementById('import-code-area').value
+    .replace(/[\s\u3000\u00a0]/g,''); // 半角・全角・改行・タブ全除去
   const errEl=document.getElementById('import-error');
   errEl.style.display='none';
+  errEl.textContent='コードが正しくありません。もう一度確認してください。';
+  if(!raw){errEl.style.display='block';return;}
   try{
-    if(!raw.startsWith('GOLF1:'))throw new Error('invalid');
-    const binary=atob(raw.slice(6));
+    if(!raw.startsWith('GOLF1:'))throw new Error('invalid prefix');
+    const b64=raw.slice(6);
+    const binary=atob(b64);
     const bytes=new Uint8Array(binary.length);
     for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
     const json=new TextDecoder().decode(bytes);
     const payload=JSON.parse(json);
-    // v2: 1ラウンド共有 / v1: 全ラウンド共有（後方互換）
     let rounds=[];
-    if(payload.single&&payload.round){
-      rounds=[payload.round];
-    }else if(payload.rounds&&Array.isArray(payload.rounds)){
-      rounds=payload.rounds;
-    }else{
-      throw new Error('invalid');
-    }
+    if(payload.single&&payload.round) rounds=[payload.round];
+    else if(payload.rounds&&Array.isArray(payload.rounds)) rounds=payload.rounds;
+    else throw new Error('invalid structure');
     closeImportModal();
     openViewer({rounds});
   }catch(e){
+    errEl.textContent='コードが正しくありません（'+e.message+'）。再度コピーして貼り付けてください。';
     errEl.style.display='block';
   }
 }
