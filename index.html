@@ -369,6 +369,14 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
       <div class="fr" onclick="openDrum('ハンディキャップ',null,hcpList,'r-hcp')"><span class="fr-lbl">ハンディキャップ</span><span class="fr-val set" id="r-hcp-v">0</span><span class="fr-arr">›</span></div>
       <div class="fr" onclick="openDrum('体調','今日の体のコンディション',bodyList,'r-body')"><span class="fr-lbl">体調</span><span class="fr-val" id="r-body-v">選択</span><span class="fr-arr">›</span></div>
     </div>
+    <div class="sec-lbl">同伴者</div>
+    <div class="card" id="companion-card">
+      <div id="companion-list-setup" style="padding:4px 0"></div>
+      <div class="fr" onclick="openCompanionSelect()" style="color:var(--green)">
+        <span class="fr-lbl" style="color:var(--green)">＋ 同伴者を追加</span>
+        <span class="fr-arr" style="color:var(--green)">›</span>
+      </div>
+    </div>
     <div class="sec-lbl">目標メモ</div>
     <div class="card"><div class="note-area"><textarea id="r-goal" placeholder="今日の目標や意識するポイント&#10;例）パーオン率70%、3パット撲滅" rows="3"></textarea></div></div>
     <button class="btn btn-primary" onclick="startRound()" style="margin-top:8px">ラウンド開始</button>
@@ -437,9 +445,13 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
 <!-- SHOT FORM -->
 <div id="s4" class="screen">
   <div class="topbar">
-    <button class="nav-btn" onclick="goTo('s3')">キャンセル</button>
+    <button class="nav-btn" onclick="cancelShotForm()">キャンセル</button>
     <div class="topbar-title" id="sf-title">ショット入力</div>
     <button class="nav-btn right" onclick="saveShot()">保存</button>
+  </div>
+  <!-- プレーヤー切り替えバー（同伴者がいる時のみ表示） -->
+  <div id="shot-owner-bar" style="display:none;background:var(--card);border-bottom:0.5px solid var(--border);padding:8px 16px;overflow-x:auto;-webkit-overflow-scrolling:touch">
+    <div id="shot-owner-tabs" style="display:inline-flex;gap:8px"></div>
   </div>
   <div class="tabs">
     <button class="tab active" onclick="switchTab(0,this)">基本</button>
@@ -746,6 +758,28 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
   </div>
 </div>
 
+<!-- COMPANION SELECT MODAL -->
+<div class="modal-overlay" id="companion-modal">
+  <div class="modal-box" style="max-height:80vh;overflow-y:auto">
+    <div class="modal-icon">👥</div>
+    <div class="modal-title">同伴者を追加</div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:12px">同伴者を選んでください（複数可）</div>
+    <div id="companion-player-list" style="text-align:left;border:0.5px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden"></div>
+    <button class="modal-btn primary" onclick="closeCompanionModal()">完了</button>
+  </div>
+</div>
+
+<!-- ASSIGN PLAYER MODAL -->
+<div class="modal-overlay" id="assign-player-modal">
+  <div class="modal-box" style="max-height:80vh;overflow-y:auto">
+    <div class="modal-icon">👤</div>
+    <div class="modal-title">プレーヤーを設定</div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:12px">このラウンドを記録したプレーヤーを選んでください</div>
+    <div id="assign-player-list" style="text-align:left;border:0.5px solid var(--border);border-radius:10px;margin-bottom:12px;overflow:hidden"></div>
+    <button class="modal-btn secondary" onclick="closeAssignPlayer()">キャンセル</button>
+  </div>
+</div>
+
 <!-- DELETE CONFIRM MODAL -->
 <div class="modal-overlay" id="delete-modal">
   <div class="modal-box">
@@ -1021,6 +1055,7 @@ function openHistoryDetail(id){
       <div class="card">${holeRows||'<div style="padding:16px;color:var(--text-2);text-align:center">データなし</div>'}</div>
       ${r.goal?`<div class="sec-lbl">目標メモ</div><div class="card"><div style="padding:14px 16px;font-size:14px;line-height:1.6;color:var(--text-2)">${r.goal}</div></div>`:''}
       <button class="btn btn-primary" onclick="resumeRound('${r.id}')" style="margin-top:8px">このラウンドを続ける</button>
+      <button class="btn btn-secondary" onclick="openAssignPlayer('${r.id}')" style="margin-top:8px">👤 プレーヤーを設定・変更</button>
       <button class="btn btn-danger" onclick="confirmDeleteRound()" style="margin-top:8px">🗑️ このラウンドを削除</button>
       <div style="height:calc(var(--safe-bot)+20px)"></div>
     </div>`;
@@ -1040,9 +1075,13 @@ function resumeRound(id){
   const rounds=loadRounds();
   const r=rounds.find(x=>x.id===id);
   if(!r)return;
-  R={...r};holes=r.holes.map(h=>({...h,shots:[...(h.shots||[])]}));
+  R={...r};
+  R._companions=r.companions||[];
+  holes=r.holes.map(h=>({...h,shots:[...(h.shots||[])]}));
+  // holeCountを復元（なければholesの長さから推定）
+  if(!R.holeCount)R.holeCount=holes.length||18;
   curHole=0;
-  for(let i=holes.length-1;i>=0;i--){if(holes[i].shots&&holes[i].shots.length){curHole=Math.min(i+1,17);break;}}
+  for(let i=holes.length-1;i>=0;i--){if(holes[i].shots&&holes[i].shots.length){curHole=Math.min(i+1,holes.length-1);break;}}
   goTo('s2');
 }
 
@@ -1181,6 +1220,9 @@ function startRound(){
   // プレーヤーIDを紐付け
   const activeId=getActivePlayerId();
   if(activeId)R.playerId=activeId;
+  // 同伴者を保存
+  R.companions=R._companions||[];
+  delete R._companions;
   // ホール数に合わせてホールを初期化
   const holeCount=parseInt((DV['r-holes']||'18H').replace('H',''))||18;
   R.holeCount=holeCount;
@@ -1193,11 +1235,14 @@ function hNum(idx){return isIN()?(idx<9?idx+10:idx-8):idx+1;}
 function renderGrid(){
   const w=document.getElementById('grid-wrap');w.innerHTML='';
   let tot=0,totPar=0,played=0;
+  const count=holes.length;
   const buildH=(lbl,indices)=>{
+    const validIdx=indices.filter(i=>i<count);
+    if(!validIdx.length)return null;
     const blk=document.createElement('div');blk.className='half-block';
-    const l=document.createElement('div');l.className='half-label';l.textContent=lbl;blk.appendChild(l);
+    if(lbl){const l=document.createElement('div');l.className='half-label';l.textContent=lbl;blk.appendChild(l);}
     const g=document.createElement('div');g.className='hole-grid';
-    indices.forEach(i=>{
+    validIdx.forEach(i=>{
       const h=holes[i];const s=h.shots.length;let cls='hbtn';let hs='';
       if(s){played++;tot+=s;totPar+=h.par;const d=s-h.par;if(d<=-2)cls+=' eagle';else if(d===-1)cls+=' birdie';else if(d===0)cls+=' par_';else if(d===1)cls+=' bogey';else cls+=' dbogey';hs=`<span class="hs">${s}</span>`;}
       if(i===curHole)cls+=' cur';
@@ -1205,10 +1250,28 @@ function renderGrid(){
     });
     blk.appendChild(g);return blk;
   };
-  if(isIN()){w.appendChild(buildH('IN（10〜18番）',[0,1,2,3,4,5,6,7,8]));w.appendChild(buildH('OUT（1〜9番）',[9,10,11,12,13,14,15,16,17]));}
-  else{w.appendChild(buildH('OUT（1〜9番）',[0,1,2,3,4,5,6,7,8]));w.appendChild(buildH('IN（10〜18番）',[9,10,11,12,13,14,15,16,17]));}
+  if(count<=6){
+    // 3H・6H：1列にまとめて表示
+    const blk=buildH(null,Array.from({length:count},(_,i)=>i));
+    if(blk)w.appendChild(blk);
+  }else if(count<=9){
+    // 9H：1ブロック
+    const blk=buildH(isIN()?'IN（10〜18番）':'OUT（1〜9番）',Array.from({length:count},(_,i)=>i));
+    if(blk)w.appendChild(blk);
+  }else{
+    // 18H：OUT/IN 2ブロック
+    if(isIN()){
+      const b1=buildH('IN（10〜18番）',[0,1,2,3,4,5,6,7,8]);
+      const b2=buildH('OUT（1〜9番）',[9,10,11,12,13,14,15,16,17]);
+      if(b1)w.appendChild(b1);if(b2)w.appendChild(b2);
+    }else{
+      const b1=buildH('OUT（1〜9番）',[0,1,2,3,4,5,6,7,8]);
+      const b2=buildH('IN（10〜18番）',[9,10,11,12,13,14,15,16,17]);
+      if(b1)w.appendChild(b1);if(b2)w.appendChild(b2);
+    }
+  }
   document.getElementById('ov-course').textContent=R.course;
-  document.getElementById('ov-date').textContent=R.date+' / '+R.side;
+  document.getElementById('ov-date').textContent=R.date+' / '+R.side+(count<18?' · '+count+'H':'');
   document.getElementById('ov-total').textContent=tot||'-';
   const vs=tot-totPar;document.getElementById('ov-vs').textContent=tot?(vs===0?'E':vs>0?'+'+vs:vs):'-';
   document.getElementById('ov-played').textContent=played?played+'H完了':'未プレー';
@@ -1218,7 +1281,19 @@ function renderHole(){
   const h=holes[curHole];
   document.getElementById('h-title').textContent=hNum(curHole)+'番ホール';
   document.getElementById('h-meta').textContent=`Par ${h.par}${h.dist?' | '+h.dist+'y':''}${h.layout?' | '+h.layout:''}${h.pin?' | ピン:'+h.pin:''}`;
-  updateHScore();renderShots();document.getElementById('h-note').value=h.note||'';
+  updateHScore();
+  const companions=R._companions||[];
+  if(companions.length>0){
+    renderShotsByOwner();
+    // 「+ショット追加」ボタンを非表示（各プレーヤーの追加ボタンを使う）
+    const addBtn=document.querySelector('.add-shot-btn');
+    if(addBtn)addBtn.style.display='none';
+  }else{
+    renderShots();
+    const addBtn=document.querySelector('.add-shot-btn');
+    if(addBtn)addBtn.style.display='block';
+  }
+  document.getElementById('h-note').value=h.note||'';
 }
 function updateHScore(){
   const h=holes[curHole];const s=h.shots.length;
@@ -1366,6 +1441,17 @@ function openShotForm(idx){
   }
 
   document.getElementById('sf-title').textContent=idx<0?`${h.shots.length+1}打目`:`${idx+1}打目を編集`;
+  // shotOwnerをSFに設定
+  if(currentShotOwner)SF.shotOwner=currentShotOwner;
+  // プレーヤーバー更新
+  updateShotOwnerBar();
+  if(currentShotOwner){
+    const players=loadPlayers();
+    const p=players.find(x=>x.id===currentShotOwner);
+    const name=p?p.name.split('（')[0]:'同伴者';
+    const ownerShots=h.shots.filter(s=>!s.isPenalty&&s.shotOwner===currentShotOwner);
+    document.getElementById('sf-title').textContent=idx<0?`${name}の${ownerShots.length+1}打目`:`${name}の${idx+1}打目を編集`;
+  }
   // ⑥ 最後にパット判定して表示切り替え
   updatePuttSection();
   switchTab(0,document.querySelector('.tab'));
@@ -1384,6 +1470,10 @@ function penaltyCount(land){
 function saveShot(){
   const h=holes[curHole];
   const shot={...SF,note:document.getElementById('sf-note').value};
+  // shotOwnerを設定（同伴者の場合）
+  if(currentShotOwner)shot.shotOwner=currentShotOwner;
+  else delete shot.shotOwner;
+  currentShotOwner=null; // リセット
   if(editShot<0){
     h.shots.push(shot);
     // 罰打があれば自動挿入
@@ -1432,7 +1522,7 @@ function onCupIn(){
   document.getElementById('cupin-next-btn').textContent=nextIdx<18?`${hNum(nextIdx)}番ホールへ →`:'集計を見る';
   document.getElementById('cupin-modal').classList.add('open');
 }
-function goNextHole(){closeCupinModal();const n=curHole+1;if(n<18){curHole=n;setupAndGoHole();}else{goTo('s2');setTimeout(()=>showSummary(),120);}}
+function goNextHole(){closeCupinModal();const n=curHole+1;if(n<holes.length){curHole=n;setupAndGoHole();}else{goTo('s2');setTimeout(()=>showSummary(),120);}}
 function closeCupinModal(){document.getElementById('cupin-modal').classList.remove('open');goTo('s3');}
 
 // ホール選択時：設定モーダルを出してからホール画面へ
@@ -3040,7 +3130,62 @@ function saveNewPlayer(){
   openPlayerSelect();
 }
 
-// loadRoundsをプレーヤー絞り込み対応に拡張
+let _assigningRoundId=null;
+
+function openAssignPlayer(roundId){
+  _assigningRoundId=roundId;
+  const players=loadPlayers();
+  const rounds=loadRounds();
+  const r=rounds.find(x=>x.id===roundId);
+  const currentPlayerId=r?r.playerId:null;
+  const list=document.getElementById('assign-player-list');
+  if(!players.length){
+    list.innerHTML=`<div style="padding:16px;text-align:center;color:var(--text-2);font-size:13px">プレーヤーがいません。<br>まずトップページでプレーヤーを追加してください。</div>`;
+  }else{
+    list.innerHTML=players.map(p=>{
+      const active=p.id===currentPlayerId;
+      return`<div onclick="assignPlayer('${p.id}')" style="display:flex;align-items:center;padding:13px 16px;border-bottom:0.5px solid var(--border-lt);cursor:pointer" ontouchstart="this.style.background='#F0EEE8'" ontouchend="this.style.background=''">
+        <div style="width:32px;height:32px;border-radius:50%;background:${active?'var(--green)':'var(--green-lt)'};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏌️</div>
+        <div style="flex:1;margin-left:12px">
+          <div style="font-size:15px;font-weight:${active?'700':'500'};color:${active?'var(--green)':'var(--text)'}">${p.name}${active?' ✓（現在設定中）':''}</div>
+          <div style="font-size:12px;color:var(--text-2)">${p.hand==='left'?'左利き':'右利き'}</div>
+        </div>
+        ${active?'<div style="font-size:18px">✓</div>':''}
+      </div>`;
+    }).join('')+
+    // 未設定の選択肢
+    `<div onclick="assignPlayer(null)" style="display:flex;align-items:center;padding:13px 16px;cursor:pointer" ontouchstart="this.style.background='#F0EEE8'" ontouchend="this.style.background=''">
+      <div style="width:32px;height:32px;border-radius:50%;background:var(--bg);border:0.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">－</div>
+      <div style="flex:1;margin-left:12px">
+        <div style="font-size:15px;color:var(--text-2)">プレーヤー未設定にする</div>
+      </div>
+    </div>`;
+  }
+  document.getElementById('assign-player-modal').classList.add('open');
+}
+
+function assignPlayer(playerId){
+  if(!_assigningRoundId)return;
+  const rounds=loadRounds();
+  const idx=rounds.findIndex(r=>r.id===_assigningRoundId);
+  if(idx<0)return;
+  if(playerId)rounds[idx].playerId=playerId;
+  else delete rounds[idx].playerId;
+  saveAllRounds(rounds);
+  closeAssignPlayer();
+  // 履歴詳細を再描画
+  openHistoryDetail(_assigningRoundId);
+  // ホーム統計も更新
+  renderHomeStats();
+  const nameEl=document.getElementById('banner-player-name');
+  if(nameEl)updatePlayerBanner();
+  alert(playerId?`「${loadPlayers().find(p=>p.id===playerId)?.name}」に設定しました`:'プレーヤー未設定にしました');
+}
+
+function closeAssignPlayer(){
+  document.getElementById('assign-player-modal').classList.remove('open');
+  _assigningRoundId=null;
+}
 function loadRoundsForPlayer(playerId){
   const all=loadRounds();
   if(!playerId)return all;
@@ -3050,6 +3195,209 @@ function loadRoundsForPlayer(playerId){
 // ホール数に合わせてinitHoles
 function initHolesByCount(count){
   holes=Array.from({length:count},(_,i)=>({num:i+1,par:4,dist:0,pin:'',shots:[],note:'',finished:false}));
+}
+
+// ===== COMPANION (同伴者) =====
+let currentShotOwner=null; // 現在入力中のプレーヤーID（nullは自分）
+
+// ラウンド設定の同伴者欄を描画
+function renderCompanionSetup(){
+  const companions=R._companions||[];
+  const players=loadPlayers();
+  const el=document.getElementById('companion-list-setup');
+  if(!el)return;
+  if(!companions.length){el.innerHTML='';return;}
+  el.innerHTML=companions.map(pid=>{
+    const p=players.find(x=>x.id===pid);
+    return`<div class="fr no-tap">
+      <span class="fr-lbl">${p?p.name:'不明'}</span>
+      <button onclick="removeCompanion('${pid}')" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:4px 0">×</button>
+    </div>`;
+  }).join('');
+}
+
+function openCompanionSelect(){
+  const players=loadPlayers();
+  const activeId=getActivePlayerId();
+  const companions=R._companions||[];
+  const list=document.getElementById('companion-player-list');
+  // 自分自身と既に追加済みを除く
+  const available=players.filter(p=>p.id!==activeId);
+  if(!available.length){
+    list.innerHTML=`<div style="padding:16px;text-align:center;color:var(--text-2);font-size:13px">追加できるプレーヤーがいません。<br>先にプレーヤーを登録してください。</div>`;
+  }else{
+    list.innerHTML=available.map(p=>{
+      const added=companions.includes(p.id);
+      return`<div onclick="toggleCompanion('${p.id}',this)" style="display:flex;align-items:center;padding:13px 16px;border-bottom:0.5px solid var(--border-lt);cursor:pointer" data-added="${added}">
+        <div style="width:32px;height:32px;border-radius:50%;background:${added?'var(--green)':'var(--green-lt)'};display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🏌️</div>
+        <div style="flex:1;margin-left:12px">
+          <div style="font-size:15px;font-weight:500">${p.name}</div>
+          <div style="font-size:12px;color:var(--text-2)">${p.hand==='left'?'左利き':'右利き'}</div>
+        </div>
+        <div id="comp-check-${p.id}" style="font-size:20px">${added?'✓':''}</div>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('companion-modal').classList.add('open');
+}
+
+function toggleCompanion(pid,row){
+  if(!R._companions)R._companions=[];
+  const idx=R._companions.indexOf(pid);
+  const added=idx>=0;
+  if(added){
+    R._companions.splice(idx,1);
+    row.dataset.added='false';
+    row.querySelector('div:first-child').style.background='var(--green-lt)';
+    const chk=document.getElementById('comp-check-'+pid);if(chk)chk.textContent='';
+  }else{
+    R._companions.push(pid);
+    row.dataset.added='true';
+    row.querySelector('div:first-child').style.background='var(--green)';
+    const chk=document.getElementById('comp-check-'+pid);if(chk)chk.textContent='✓';
+  }
+  renderCompanionSetup();
+}
+
+function removeCompanion(pid){
+  if(!R._companions)return;
+  R._companions=R._companions.filter(x=>x!==pid);
+  renderCompanionSetup();
+}
+
+function closeCompanionModal(){
+  document.getElementById('companion-modal').classList.remove('open');
+  renderCompanionSetup();
+}
+
+// ショット入力のプレーヤーバーを更新
+function updateShotOwnerBar(){
+  const bar=document.getElementById('shot-owner-bar');
+  const tabs=document.getElementById('shot-owner-tabs');
+  const companions=R._companions||[];
+  const players=loadPlayers();
+  const activeId=getActivePlayerId();
+  const allOwners=[activeId,...companions].filter(Boolean);
+  if(allOwners.length<=1){bar.style.display='none';return;}
+  bar.style.display='block';
+  tabs.innerHTML=allOwners.map(pid=>{
+    const p=players.find(x=>x.id===pid);
+    const name=p?p.name.split('（')[0]:(pid===activeId?'自分':'?');
+    const active=(currentShotOwner||activeId)===pid;
+    return`<button onclick="switchShotOwner('${pid}')" style="padding:6px 14px;border-radius:20px;border:1.5px solid ${active?'var(--green)':'var(--border)'};background:${active?'var(--green)':'var(--card)'};color:${active?'#fff':'var(--text-2)'};font-size:13px;font-weight:${active?'600':'400'};cursor:pointer;white-space:nowrap;font-family:inherit">${active?'✏️ ':' '}${name}</button>`;
+  }).join('');
+}
+
+function switchShotOwner(pid){
+  const activeId=getActivePlayerId();
+  currentShotOwner=pid===activeId?null:pid;
+  updateShotOwnerBar();
+  // タイトルも更新
+  const players=loadPlayers();
+  const p=players.find(x=>x.id===pid);
+  const name=p?p.name.split('（')[0]:'自分';
+  const h=holes[curHole];
+  // そのプレーヤーの現在の打数を計算
+  const ownerShots=h.shots.filter(s=>!s.isPenalty&&(s.shotOwner||null)===(currentShotOwner));
+  document.getElementById('sf-title').textContent=`${name}の${ownerShots.length+1}打目`;
+}
+
+// ホールのショット数を特定プレーヤー分で取得
+function getShotsForOwner(h, ownerId){
+  const activeId=getActivePlayerId();
+  return h.shots.filter(s=>!s.isPenalty&&(s.shotOwner||null)===(ownerId===activeId?null:ownerId));
+}
+
+// キャンセルボタンの処理（プレーヤー切り替え中も正しくs3に戻る）
+function cancelShotForm(){
+  currentShotOwner=null;
+  goTo('s3');
+}
+
+// ホール画面のショットリストを同伴者別に描画
+function renderShotsByOwner(){
+  const h=holes[curHole];
+  const el=document.getElementById('shot-list');
+  const companions=R._companions||[];
+  const players=loadPlayers();
+  const activeId=getActivePlayerId();
+  const allOwners=[activeId,...companions].filter(Boolean);
+
+  if(!allOwners.length||allOwners.length===1){
+    // 同伴者なし：従来の表示
+    renderShots();return;
+  }
+
+  el.innerHTML='';
+  recalcHitDist(h);
+
+  allOwners.forEach(ownerId=>{
+    const p=players.find(x=>x.id===ownerId);
+    const name=p?p.name:(ownerId===activeId?'自分':'?');
+    const ownerShots=h.shots.filter(s=>(s.shotOwner||null)===(ownerId===activeId?null:ownerId));
+
+    const section=document.createElement('div');
+    // プレーヤー名ヘッダー
+    section.innerHTML=`<div style="padding:8px 16px 4px;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.06em;background:var(--bg)">${name}（${ownerShots.filter(s=>!s.isPenalty).length}打）</div>`;
+
+    const ownerRealShots=ownerShots.filter(s=>!s.isPenalty);
+    if(!ownerRealShots.length){
+      section.innerHTML+=`<div style="padding:10px 16px;font-size:13px;color:var(--text-3)">未入力</div>`;
+    }else{
+      ownerRealShots.forEach((s,i)=>{
+        const isP=s.club&&s.club.includes('パター');
+        const clubShort=(s.club||'-').replace(/（.*?）/,'');
+        const du=s.dist_unit||'y';
+        const dp=s.hitdist?`${s.hitdist}y打→`:s.dist?`残${s.dist}${du}`:'';
+        const cupMark=s.cupIn?'<span style="color:var(--blue)"> ⛳</span>':'';
+        const globalIdx=h.shots.indexOf(s);
+        const div=document.createElement('div');
+        div.className='shot-item';
+        div.innerHTML=`<div class="shot-num${isP?' is-putt':''}">${i+1}</div>
+          <div class="shot-body">
+            <div class="shot-club">${clubShort}${cupMark} <span style="font-weight:400;font-size:13px;color:var(--text-2)">${dp}</span></div>
+            <div class="shot-dtl">${[s.lie,s.land||s.pbreak,s.dir].filter(Boolean).join(' → ')}</div>
+          </div><span class="shot-meta">${s.acc||''}</span>`;
+        div.onclick=()=>{currentShotOwner=ownerId===activeId?null:ownerId;openShotForm(globalIdx);};
+        section.appendChild(div);
+      });
+    }
+
+    // そのプレーヤーのショット追加ボタン
+    const addBtn=document.createElement('button');
+    addBtn.style.cssText='width:calc(100% - 0px);padding:10px 16px;background:none;border:none;border-top:0.5px solid var(--border-lt);color:var(--green);font-size:13px;font-weight:500;cursor:pointer;text-align:left;font-family:inherit';
+    addBtn.textContent=`＋ ${name}のショットを追加`;
+    addBtn.onclick=()=>{currentShotOwner=ownerId===activeId?null:ownerId;openShotForm(-1);};
+    section.appendChild(addBtn);
+
+    el.appendChild(section);
+  });
+}
+
+// 同伴者データを共有ファイルとして書き出す
+function exportCompanionData(companionId){
+  const rounds=loadRounds();
+  const players=loadPlayers();
+  const p=players.find(x=>x.id===companionId);
+  // そのプレーヤーのラウンドデータを抽出
+  const companionRounds=rounds.filter(r=>(R._companions||[]).includes(companionId)||r.playerId===companionId).map(r=>{
+    // そのプレーヤーのショットだけ残す
+    const filteredHoles=(r.holes||[]).map(h=>({
+      ...h,
+      shots:h.shots.filter(s=>s.shotOwner===companionId||(s.shotOwner===undefined&&false))
+    }));
+    return{...r,holes:filteredHoles,playerId:companionId};
+  });
+  if(!companionRounds.length){alert('共有できるデータがありません。');return;}
+  try{
+    const json=JSON.stringify({v:2,round:{...companionRounds[0],playerId:companionId}},null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`golf_${p?p.name:'companion'}_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(a);a.click();
+    document.body.removeChild(a);URL.revokeObjectURL(url);
+  }catch(e){alert('書き出しに失敗しました。');}
 }
 
 // SERVICE WORKER
