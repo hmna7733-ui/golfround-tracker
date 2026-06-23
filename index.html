@@ -322,11 +322,14 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <button class="btn btn-primary" onclick="goTo('s1')">+ 新しいラウンドを開始</button>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
       <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="openAnalysis()">📊 スコア分析</button>
-      <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="goTo('s11')">⚙️ プロフィール</button>
+      <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="goTo('s13')">👤 プレーヤー</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
       <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="openShareModal()">📤 データを共有</button>
       <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="openImportModal()">📥 友達のデータ</button>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr;gap:8px;margin-top:8px">
+      <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="goTo('s11')">⚙️ プロフィール設定</button>
     </div>
     <div id="home-list"></div>
   </div>
@@ -372,8 +375,8 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <div class="sec-lbl">同伴者</div>
     <div class="card" id="companion-card">
       <div id="companion-list-setup" style="padding:4px 0"></div>
-      <div class="fr" onclick="openCompanionSelect()" style="color:var(--green)">
-        <span class="fr-lbl" style="color:var(--green)">＋ 同伴者を追加</span>
+      <div class="fr" onclick="goTo('s14')" style="color:var(--green)">
+        <span class="fr-lbl" style="color:var(--green)">＋ 同伴者を設定・変更</span>
         <span class="fr-arr" style="color:var(--green)">›</span>
       </div>
     </div>
@@ -460,7 +463,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
   <div id="tp0" class="tab-pane active"><div class="sf-sec">
     <div class="sf-sec-lbl">番手</div>
     <div class="card">
-      <div class="fr" onclick="openDrum('番手',null,getActiveClubs(),'sf-club')"><span class="fr-lbl">クラブ</span><span class="fr-val" id="sf-club-v">選択</span><span class="fr-arr">›</span></div>
+      <div class="fr" onclick="openDrum('番手',null,getCurrentOwnerClubs(),'sf-club')"><span class="fr-lbl">クラブ</span><span class="fr-val" id="sf-club-v">選択</span><span class="fr-arr">›</span></div>
       <div class="fr" id="row-stype" onclick="openDrum('ショット種類',null,shotTypes,'sf-stype')"><span class="fr-lbl">ショット種類</span><span class="fr-val set" id="sf-stype-v">フルショット</span><span class="fr-arr">›</span></div>
       <div class="fr" id="row-shape" onclick="openDrum('意図した球筋',null,getShotShapes(),'sf-shape')"><span class="fr-lbl">意図した球筋</span><span class="fr-val set" id="sf-shape-v">ストレート</span><span class="fr-arr">›</span></div>
     </div>
@@ -658,6 +661,92 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <div class="modal-sub" id="cupin-sub"></div>
     <button class="modal-btn primary" id="cupin-next-btn" onclick="goNextHole()"></button>
     <button class="modal-btn secondary" onclick="closeCupinModal()">このホールに留まる</button>
+  </div>
+</div>
+
+<!-- PLAYER MANAGEMENT s13 -->
+<div id="s13" class="screen">
+  <div class="topbar">
+    <button class="nav-btn" onclick="goTo('s0')">← ホーム</button>
+    <div class="topbar-title">プレーヤー管理</div>
+    <button class="nav-btn right" onclick="goTo('s13-add')" style="display:none" id="s13-add-btn"></button>
+  </div>
+  <div class="content" id="s13-content"></div>
+</div>
+
+<!-- ADD/EDIT PLAYER s13-add（画面として実装） -->
+<div id="s13-add" class="screen">
+  <div class="topbar">
+    <button class="nav-btn" onclick="goTo('s13')">← 戻る</button>
+    <div class="topbar-title" id="s13-add-title">プレーヤーを追加</div>
+    <button class="nav-btn right" onclick="savePlayerForm()">保存</button>
+  </div>
+  <div class="content">
+    <div class="sec-lbl">基本情報</div>
+    <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">名前 <span style="color:var(--red)">*</span></label>
+        <input class="profile-input" id="pf-name" placeholder="例：中田はやと"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">利き手</label>
+        <div class="chip-sel-group">
+          <button class="chip-sel active" id="pf-hand-right" onclick="setPfHand('right',this)">右利き</button>
+          <button class="chip-sel" id="pf-hand-left" onclick="setPfHand('left',this)">左利き</button>
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">メモ（ニックネームなど）</label>
+        <input class="profile-input" id="pf-note" placeholder="例：左打ちの俺、高校の友達など"></div>
+    </div>
+    <div class="sec-lbl">目標</div>
+    <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">目標スコア</label>
+        <input class="profile-input" id="pf-goal" placeholder="例：90" inputmode="numeric" type="number"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">ハンディキャップ</label>
+        <input class="profile-input" id="pf-hcp" placeholder="例：18" inputmode="decimal" type="number" step="0.1"></div>
+    </div>
+    <div id="pf-delete-wrap" style="display:none;margin-top:8px">
+      <button class="btn btn-danger" onclick="deletePlayerFromForm()">🗑️ このプレーヤーを削除</button>
+    </div>
+  </div>
+</div>
+
+<!-- COMPANION SETUP s14 -->
+<div id="s14" class="screen">
+  <div class="topbar">
+    <button class="nav-btn" id="s14-back-btn" onclick="goTo('s1')">← 戻る</button>
+    <div class="topbar-title">同伴者</div>
+    <button class="nav-btn right" onclick="openAddCompanion()">＋ 追加</button>
+  </div>
+  <div class="content" id="s14-content"></div>
+</div>
+
+<!-- ADD/EDIT COMPANION -->
+<div id="s14-add" class="screen">
+  <div class="topbar">
+    <button class="nav-btn" onclick="goTo('s14')">← 戻る</button>
+    <div class="topbar-title" id="s14-add-title">同伴者を追加</div>
+    <button class="nav-btn right" onclick="saveCompanionForm()">保存</button>
+  </div>
+  <div class="content">
+    <div class="sec-lbl">基本情報</div>
+    <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">名前 <span style="color:var(--red)">*</span></label>
+        <input class="profile-input" id="cf-name" placeholder="例：田中太郎"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">利き手</label>
+        <div class="chip-sel-group">
+          <button class="chip-sel active" id="cf-hand-right" onclick="setCfHand('right',this)">右利き</button>
+          <button class="chip-sel" id="cf-hand-left" onclick="setCfHand('left',this)">左利き</button>
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">メモ（関係性など）</label>
+        <input class="profile-input" id="cf-note" placeholder="例：職場の同僚、ゴルフ仲間など"></div>
+    </div>
+    <div class="sec-lbl">クラブ設定（名前・フル/3/4/1/2キャリーを入力）</div>
+    <div style="font-size:12px;color:var(--text-2);padding:0 4px 8px;line-height:1.5">「使う」チェックを外すと入力に出てきません。</div>
+    <div class="card" style="padding:4px 16px" id="cf-club-list-card"></div>
+    <button onclick="addCfClubRow()" class="btn btn-secondary" style="margin-top:8px;font-size:14px;padding:12px">＋ クラブを追加</button>
+    <div id="cf-delete-wrap" style="display:none;margin-top:16px">
+      <button class="btn btn-danger" onclick="deleteCompanionFromForm()">🗑️ この同伴者を削除</button>
+    </div>
+    <div style="height:calc(var(--safe-bot)+24px)"></div>
   </div>
 </div>
 
@@ -1127,7 +1216,8 @@ function goTo(id){
   if(id==='s6'){renderHistoryList();}
   if(id==='s8')renderAnalysis();
   if(id==='s11')renderProfilePage();
-}
+  if(id==='s13')renderS13();
+  if(id==='s14')renderS14();}
 
 function fmtDate(d){return d.getFullYear()+'/'+(d.getMonth()+1).toString().padStart(2,'0')+'/'+d.getDate().toString().padStart(2,'0');}
 function initHoles(){holes=Array.from({length:18},(_,i)=>({num:i+1,par:4,dist:0,pin:'',shots:[],note:'',finished:false}));}
@@ -2927,6 +3017,12 @@ function getActiveClubs(){
   return window._customClubs||getClubList();
 }
 
+// 現在入力中のプレーヤー（自分 or 同伴者）のクラブリストを返す
+function getCurrentOwnerClubs(){
+  if(!currentShotOwner)return getActiveClubs();
+  return getCfClubList(currentShotOwner);
+}
+
 // ===== SHOT LIST FOR EDITING (s12) =====
 let s12Context={type:'',key:'',title:'',fromScreen:'s8'};
 
@@ -3018,6 +3114,7 @@ function editShotFromS12(roundId,holeIdx,shotIdx){
 // saveShot後にs12用の後処理をhook
 // ===== PLAYER MANAGEMENT =====
 const PLAYERS_KEY='golf_players_v1';
+const COMPANIONS_KEY='golf_companions_v1'; // 同伴者専用（自分とは別管理）
 const ACTIVE_PLAYER_KEY='golf_active_player_v1';
 
 function loadPlayers(){
@@ -3025,6 +3122,13 @@ function loadPlayers(){
 }
 function savePlayers(players){
   localStorage.setItem(PLAYERS_KEY,JSON.stringify(players));
+}
+// 同伴者（自分とは別リスト）
+function loadCompanions(){
+  try{return JSON.parse(localStorage.getItem(COMPANIONS_KEY)||'[]');}catch(e){return [];}
+}
+function saveCompanions(companions){
+  localStorage.setItem(COMPANIONS_KEY,JSON.stringify(companions));
 }
 function getActivePlayerId(){
   return localStorage.getItem(ACTIVE_PLAYER_KEY)||null;
@@ -3203,15 +3307,15 @@ let currentShotOwner=null; // 現在入力中のプレーヤーID（nullは自�
 // ラウンド設定の同伴者欄を描画
 function renderCompanionSetup(){
   const companions=R._companions||[];
-  const players=loadPlayers();
+  const allCompanions=loadCompanions();
   const el=document.getElementById('companion-list-setup');
   if(!el)return;
   if(!companions.length){el.innerHTML='';return;}
-  el.innerHTML=companions.map(pid=>{
-    const p=players.find(x=>x.id===pid);
+  el.innerHTML=companions.map(cid=>{
+    const c=allCompanions.find(x=>x.id===cid);
     return`<div class="fr no-tap">
-      <span class="fr-lbl">${p?p.name:'不明'}</span>
-      <button onclick="removeCompanion('${pid}')" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:4px 0">×</button>
+      <span class="fr-lbl">${c?c.name:'不明'} <span style="font-size:11px;color:var(--text-3)">${c&&c.hand==='left'?'左利き':'右利き'}</span></span>
+      <button onclick="removeCompanion('${cid}')" style="background:none;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:4px 0">×</button>
     </div>`;
   }).join('');
 }
@@ -3275,16 +3379,18 @@ function updateShotOwnerBar(){
   const bar=document.getElementById('shot-owner-bar');
   const tabs=document.getElementById('shot-owner-tabs');
   const companions=R._companions||[];
+  const allCompanions=loadCompanions();
   const players=loadPlayers();
   const activeId=getActivePlayerId();
   const allOwners=[activeId,...companions].filter(Boolean);
   if(allOwners.length<=1){bar.style.display='none';return;}
   bar.style.display='block';
-  tabs.innerHTML=allOwners.map(pid=>{
-    const p=players.find(x=>x.id===pid);
-    const name=p?p.name.split('（')[0]:(pid===activeId?'自分':'?');
-    const active=(currentShotOwner||activeId)===pid;
-    return`<button onclick="switchShotOwner('${pid}')" style="padding:6px 14px;border-radius:20px;border:1.5px solid ${active?'var(--green)':'var(--border)'};background:${active?'var(--green)':'var(--card)'};color:${active?'#fff':'var(--text-2)'};font-size:13px;font-weight:${active?'600':'400'};cursor:pointer;white-space:nowrap;font-family:inherit">${active?'✏️ ':' '}${name}</button>`;
+  tabs.innerHTML=allOwners.map(ownerId=>{
+    const p=players.find(x=>x.id===ownerId);
+    const c=allCompanions.find(x=>x.id===ownerId);
+    const name=ownerId===activeId?(p?p.name.split('（')[0]:'自分'):(c?c.name.split('（')[0]:'同伴者');
+    const active=(currentShotOwner||activeId)===ownerId;
+    return`<button onclick="switchShotOwner('${ownerId}')" style="padding:6px 14px;border-radius:20px;border:1.5px solid ${active?'var(--green)':'var(--border)'};background:${active?'var(--green)':'var(--card)'};color:${active?'#fff':'var(--text-2)'};font-size:13px;font-weight:${active?'600':'400'};cursor:pointer;white-space:nowrap;font-family:inherit">${active?'✏️ ':' '}${name}</button>`;
   }).join('');
 }
 
@@ -3319,6 +3425,7 @@ function renderShotsByOwner(){
   const h=holes[curHole];
   const el=document.getElementById('shot-list');
   const companions=R._companions||[];
+  const allCompanions=loadCompanions();
   const players=loadPlayers();
   const activeId=getActivePlayerId();
   const allOwners=[activeId,...companions].filter(Boolean);
@@ -3333,7 +3440,8 @@ function renderShotsByOwner(){
 
   allOwners.forEach(ownerId=>{
     const p=players.find(x=>x.id===ownerId);
-    const name=p?p.name:(ownerId===activeId?'自分':'?');
+    const c=allCompanions.find(x=>x.id===ownerId);
+    const name=ownerId===activeId?(p?p.name:'自分'):(c?c.name:'同伴者');
     const ownerShots=h.shots.filter(s=>(s.shotOwner||null)===(ownerId===activeId?null:ownerId));
 
     const section=document.createElement('div');
@@ -3398,6 +3506,319 @@ function exportCompanionData(companionId){
     document.body.appendChild(a);a.click();
     document.body.removeChild(a);URL.revokeObjectURL(url);
   }catch(e){alert('書き出しに失敗しました。');}
+}
+
+// ===== PLAYER MANAGEMENT SCREEN (s13) =====
+let _editingPlayerId=null;
+let _pfHand='right';
+
+function renderS13(){
+  const players=loadPlayers();
+  const activeId=getActivePlayerId();
+  const el=document.getElementById('s13-content');
+  if(!el)return;
+
+  const rows=players.map(p=>{
+    const active=p.id===activeId;
+    return`<div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border-lt);cursor:pointer" onclick="openEditPlayer('${p.id}')">
+      <div style="width:40px;height:40px;border-radius:50%;background:${active?'var(--green)':'var(--green-lt)'};display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">🏌️</div>
+      <div style="flex:1;margin-left:12px">
+        <div style="font-size:15px;font-weight:${active?'700':'500'};color:${active?'var(--green)':'var(--text)'}">${p.name}${active?' <span style="font-size:11px;background:var(--green);color:#fff;padding:1px 6px;border-radius:6px;font-weight:500">使用中</span>':''}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${p.hand==='left'?'左利き':'右利き'}${p.note?' · '+p.note:''}${p.goalScore?' · 目標'+p.goalScore+'打':''}</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-2)">編集 ›</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    ${players.length?`<div class="sec-lbl">登録済みプレーヤー（タップして編集）</div>
+    <div class="card">${rows}</div>`
+    :`<div style="text-align:center;padding:40px 20px;color:var(--text-2)">プレーヤーがいません。<br>追加してください。</div>`}
+    <button class="btn btn-primary" onclick="openAddPlayer()" style="margin-top:16px">＋ 新しいプレーヤーを追加</button>
+    <div class="sec-lbl" style="margin-top:20px">プレーヤーを切り替え</div>
+    <div class="card">${players.map(p=>`
+      <div style="display:flex;align-items:center;padding:13px 16px;border-bottom:0.5px solid var(--border-lt);cursor:pointer" onclick="selectPlayerAndBack('${p.id}')">
+        <div style="flex:1;font-size:15px">${p.name}</div>
+        ${p.id===activeId?'<span style="font-size:12px;color:var(--green);font-weight:600">✓ 使用中</span>':'<span style="font-size:12px;color:var(--text-3)">選択 ›</span>'}
+      </div>`).join('')||'<div style="padding:14px 16px;color:var(--text-2);font-size:14px">プレーヤーを追加してください</div>'}
+    </div>
+    <div style="height:calc(var(--safe-bot)+24px)"></div>`;
+}
+
+function selectPlayerAndBack(id){
+  setActivePlayerId(id);
+  updatePlayerBanner();
+  renderHome();
+  goTo('s13');
+}
+
+function openAddPlayer(){
+  _editingPlayerId=null;_pfHand='right';
+  document.getElementById('s13-add-title').textContent='プレーヤーを追加';
+  document.getElementById('pf-name').value='';
+  document.getElementById('pf-note').value='';
+  document.getElementById('pf-goal').value='';
+  document.getElementById('pf-hcp').value='';
+  document.getElementById('pf-hand-right').classList.add('active');
+  document.getElementById('pf-hand-left').classList.remove('active');
+  document.getElementById('pf-delete-wrap').style.display='none';
+  goTo('s13-add');
+}
+
+function openEditPlayer(id){
+  _editingPlayerId=id;
+  const players=loadPlayers();
+  const p=players.find(x=>x.id===id);
+  if(!p)return;
+  _pfHand=p.hand||'right';
+  document.getElementById('s13-add-title').textContent='プレーヤーを編集';
+  document.getElementById('pf-name').value=p.name||'';
+  document.getElementById('pf-note').value=p.note||'';
+  document.getElementById('pf-goal').value=p.goalScore||'';
+  document.getElementById('pf-hcp').value=p.handicap||'';
+  document.getElementById('pf-hand-right').classList.toggle('active',_pfHand==='right');
+  document.getElementById('pf-hand-left').classList.toggle('active',_pfHand==='left');
+  document.getElementById('pf-delete-wrap').style.display='block';
+  goTo('s13-add');
+}
+
+function setPfHand(hand,el){
+  _pfHand=hand;
+  document.getElementById('pf-hand-right').classList.toggle('active',hand==='right');
+  document.getElementById('pf-hand-left').classList.toggle('active',hand==='left');
+}
+
+function savePlayerForm(){
+  const name=document.getElementById('pf-name').value.trim();
+  if(!name){alert('名前を入力してください');return;}
+  const players=loadPlayers();
+  if(_editingPlayerId){
+    // 編集
+    const idx=players.findIndex(p=>p.id===_editingPlayerId);
+    if(idx>=0){
+      players[idx].name=name;
+      players[idx].hand=_pfHand;
+      players[idx].note=document.getElementById('pf-note').value.trim();
+      players[idx].goalScore=document.getElementById('pf-goal').value.trim();
+      players[idx].handicap=document.getElementById('pf-hcp').value.trim();
+    }
+    savePlayers(players);
+  }else{
+    // 新規
+    const p={id:'p_'+Date.now(),name,hand:_pfHand,
+      note:document.getElementById('pf-note').value.trim(),
+      goalScore:document.getElementById('pf-goal').value.trim(),
+      handicap:document.getElementById('pf-hcp').value.trim(),
+      createdAt:new Date().toISOString()};
+    players.push(p);
+    savePlayers(players);
+    // 最初のプレーヤーなら自動選択
+    if(players.length===1)setActivePlayerId(p.id);
+  }
+  updatePlayerBanner();
+  goTo('s13');
+}
+
+function deletePlayerFromForm(){
+  if(!_editingPlayerId)return;
+  const players=loadPlayers();
+  const p=players.find(x=>x.id===_editingPlayerId);
+  if(!confirm(`「${p?.name}」を削除しますか？`))return;
+  const newPlayers=players.filter(x=>x.id!==_editingPlayerId);
+  savePlayers(newPlayers);
+  if(getActivePlayerId()===_editingPlayerId){
+    localStorage.removeItem(ACTIVE_PLAYER_KEY);
+    updatePlayerBanner();
+  }
+  goTo('s13');
+}
+
+// ===== COMPANION SETUP SCREEN (s14) =====
+function renderS14(){
+  const companions=loadCompanions();
+  const selected=R._companions||[];
+  const el=document.getElementById('s14-content');
+  if(!el)return;
+
+  // ラウンド設定から来たか、ホームから来たかでバック先を変える
+  const fromRound=document.getElementById('s14-back-btn');
+
+  const rows=companions.map(c=>{
+    const isSelected=selected.includes(c.id);
+    return`<div style="display:flex;align-items:center;padding:14px 16px;border-bottom:0.5px solid var(--border-lt)">
+      <div onclick="toggleS14Companion('${c.id}')" style="display:flex;align-items:center;flex:1;cursor:pointer;gap:12px">
+        <div style="width:36px;height:36px;border-radius:50%;background:${isSelected?'var(--green)':'var(--green-lt)'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0" id="s14-icon-${c.id}">🏌️</div>
+        <div style="flex:1">
+          <div style="font-size:15px;font-weight:500">${c.name}</div>
+          <div style="font-size:12px;color:var(--text-2)">${c.hand==='left'?'左利き':'右利き'}${c.note?' · '+c.note:''}</div>
+        </div>
+        <div id="s14-chk-${c.id}" style="font-size:22px;color:var(--green);margin-right:8px">${isSelected?'✓':''}</div>
+      </div>
+      <button onclick="openEditCompanion('${c.id}')" style="background:none;border:none;color:var(--text-3);font-size:13px;cursor:pointer;padding:4px 8px;flex-shrink:0">編集</button>
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div style="font-size:13px;color:var(--text-2);padding:0 4px 12px;line-height:1.5">チェックした人が今日の同伴者になります。<br>「＋ 追加」で新しい同伴者を登録できます。</div>
+    ${companions.length
+      ?`<div class="card" style="margin-bottom:12px">${rows}</div>
+        <button class="btn btn-primary" onclick="confirmCompanions()">この内容で決定</button>`
+      :`<div class="card"><div style="padding:24px 16px;text-align:center;color:var(--text-2)">
+          同伴者が登録されていません。<br>右上の「＋ 追加」から登録してください。
+        </div></div>`}
+    <div style="height:calc(var(--safe-bot)+24px)"></div>`;
+}
+
+function toggleS14Companion(cid){
+  if(!R._companions)R._companions=[];
+  const idx=R._companions.indexOf(cid);
+  const adding=idx<0;
+  if(adding)R._companions.push(cid);
+  else R._companions.splice(idx,1);
+  const icon=document.getElementById('s14-icon-'+cid);
+  const chk=document.getElementById('s14-chk-'+cid);
+  if(icon)icon.style.background=adding?'var(--green)':'var(--green-lt)';
+  if(chk)chk.textContent=adding?'✓':'';
+}
+
+function confirmCompanions(){
+  renderCompanionSetup();
+  goTo('s1');
+}
+
+// 同伴者フォーム
+let _editingCompanionId=null;
+let _cfHand='right';
+let _cfClubs=[];
+
+function buildCfClubRows(clubs){
+  if(!clubs.length)return '<div style="padding:12px 0;text-align:center;color:var(--text-3);font-size:13px">クラブ未登録。「＋ クラブを追加」で追加してください。</div>';
+  return clubs.map((c,i)=>`
+    <div class="club-setting-row">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:700">${c.id||'C'+(i+1)}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);cursor:pointer">
+            <input type="checkbox" id="cfcu_${i}" ${c.use===false?'':'checked'} style="width:16px;height:16px;accent-color:var(--green)">使用する
+          </label>
+          <button onclick="deleteCfClubRow(${i})" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:2px 4px;line-height:1">×</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px">
+        <input class="club-input" placeholder="クラブ名" value="${c.name||''}" id="cfcn_${i}" style="flex:3;min-width:0">
+        <div style="flex:1;min-width:52px;max-width:72px;position:relative">
+          <input class="club-input" placeholder="フル" value="${c.carry||''}" id="cfcc_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11px;color:var(--text-3);width:56px;text-align:right;flex-shrink:0">3/4 / 1/2</span>
+        <div style="flex:1;position:relative">
+          <input class="club-input" placeholder="3/4y" value="${c.carry3q||''}" id="cfc3q_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+        <div style="flex:1;position:relative">
+          <input class="club-input" placeholder="1/2y" value="${c.carry12||''}" id="cfc12_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function renderCfClubList(){
+  const card=document.getElementById('cf-club-list-card');
+  if(card)card.innerHTML=buildCfClubRows(_cfClubs);
+}
+
+function syncCfClubsFromDOM(){
+  _cfClubs=_cfClubs.map((c,i)=>({
+    ...c,
+    name:document.getElementById('cfcn_'+i)?.value||c.name||'',
+    carry:document.getElementById('cfcc_'+i)?.value||c.carry||'',
+    carry3q:document.getElementById('cfc3q_'+i)?.value||c.carry3q||'',
+    carry12:document.getElementById('cfc12_'+i)?.value||c.carry12||'',
+    use:document.getElementById('cfcu_'+i)?.checked!==false,
+  }));
+}
+
+function addCfClubRow(){
+  syncCfClubsFromDOM();
+  _cfClubs.push({id:'C'+(_cfClubs.length+1),name:'',carry:'',carry3q:'',carry12:'',use:true});
+  renderCfClubList();
+  setTimeout(()=>{const s=document.getElementById('s14-add');if(s)s.scrollTop=s.scrollHeight;},50);
+}
+
+function deleteCfClubRow(idx){
+  syncCfClubsFromDOM();
+  _cfClubs.splice(idx,1);
+  renderCfClubList();
+}
+
+function getCfClubList(companionId){
+  const companions=loadCompanions();
+  const c=companions.find(x=>x.id===companionId);
+  if(c&&c.clubs&&c.clubs.length)return c.clubs.filter(x=>x.use!==false).map(x=>x.name||x.id);
+  return DEFAULT_CLUBS.map(d=>d.name);
+}
+
+function openAddCompanion(){
+  _editingCompanionId=null;_cfHand='right';
+  _cfClubs=DEFAULT_CLUBS.map(c=>({...c}));
+  document.getElementById('s14-add-title').textContent='同伴者を追加';
+  document.getElementById('cf-name').value='';
+  document.getElementById('cf-note').value='';
+  document.getElementById('cf-hand-right').classList.add('active');
+  document.getElementById('cf-hand-left').classList.remove('active');
+  document.getElementById('cf-delete-wrap').style.display='none';
+  renderCfClubList();
+  goTo('s14-add');
+}
+
+function openEditCompanion(id){
+  const companions=loadCompanions();
+  const c=companions.find(x=>x.id===id);
+  if(!c)return;
+  _editingCompanionId=id;_cfHand=c.hand||'right';
+  _cfClubs=(c.clubs&&c.clubs.length)?c.clubs.map(x=>({...x})):DEFAULT_CLUBS.map(d=>({...d}));
+  document.getElementById('s14-add-title').textContent='同伴者を編集';
+  document.getElementById('cf-name').value=c.name||'';
+  document.getElementById('cf-note').value=c.note||'';
+  document.getElementById('cf-hand-right').classList.toggle('active',_cfHand==='right');
+  document.getElementById('cf-hand-left').classList.toggle('active',_cfHand==='left');
+  document.getElementById('cf-delete-wrap').style.display='block';
+  renderCfClubList();
+  goTo('s14-add');
+}
+
+function setCfHand(hand,el){
+  _cfHand=hand;
+  document.getElementById('cf-hand-right').classList.toggle('active',hand==='right');
+  document.getElementById('cf-hand-left').classList.toggle('active',hand==='left');
+}
+
+function saveCompanionForm(){
+  const name=document.getElementById('cf-name').value.trim();
+  if(!name){alert('名前を入力してください');return;}
+  syncCfClubsFromDOM();
+  const companions=loadCompanions();
+  const data={name,hand:_cfHand,note:document.getElementById('cf-note').value.trim(),clubs:_cfClubs};
+  if(_editingCompanionId){
+    const idx=companions.findIndex(c=>c.id===_editingCompanionId);
+    if(idx>=0)companions[idx]={...companions[idx],...data};
+  }else{
+    companions.push({id:'c_'+Date.now(),...data});
+  }
+  saveCompanions(companions);
+  goTo('s14');
+}
+
+function deleteCompanionFromForm(){
+  if(!_editingCompanionId)return;
+  if(!confirm('この同伴者を削除しますか？'))return;
+  const companions=loadCompanions().filter(c=>c.id!==_editingCompanionId);
+  saveCompanions(companions);
+  if(R._companions)R._companions=R._companions.filter(id=>id!==_editingCompanionId);
+  goTo('s14');
 }
 
 // SERVICE WORKER
