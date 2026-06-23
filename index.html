@@ -671,12 +671,16 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
 
 <!-- 共有モーダル -->
 <div class="modal-overlay" id="share-modal">
-  <div class="modal-box">
+  <div class="modal-box" style="max-height:80vh;overflow-y:auto">
     <div class="modal-icon">📤</div>
-    <div class="modal-title">データを共有する</div>
-    <div class="modal-sub" style="margin-bottom:12px">共有コードをコピーして、LINEやメッセージで友達に送ってください。</div>
-    <textarea id="share-code-area" readonly style="width:100%;height:80px;border:0.5px solid var(--border);border-radius:10px;padding:10px;font-size:11px;font-family:monospace;background:var(--bg);color:var(--text-2);resize:none;outline:none;line-height:1.4"></textarea>
-    <button class="modal-btn primary" onclick="copyShareCode()" id="copy-btn">コードをコピー</button>
+    <div class="modal-title">ラウンドを共有する</div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:12px">共有するラウンドを選んでください</div>
+    <div id="share-round-list" style="text-align:left;margin-bottom:12px;max-height:240px;overflow-y:auto;border:0.5px solid var(--border);border-radius:10px"></div>
+    <div id="share-code-wrap" style="display:none">
+      <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">共有コードをコピーしてLINEなどで送ってください</div>
+      <textarea id="share-code-area" readonly style="width:100%;height:72px;border:0.5px solid var(--border);border-radius:10px;padding:10px;font-size:10px;font-family:monospace;background:var(--bg);color:var(--text-2);resize:none;outline:none;line-height:1.4;word-break:break-all"></textarea>
+      <button class="modal-btn primary" onclick="copyShareCode()" id="copy-btn" style="margin-top:8px">コードをコピー</button>
+    </div>
     <button class="modal-btn secondary" onclick="closeShareModal()">閉じる</button>
   </div>
 </div>
@@ -2269,19 +2273,55 @@ function renderAnalysis(){
 function openShareModal(){
   const rounds=loadRounds();
   if(!rounds.length){alert('共有するラウンドデータがありません。');return;}
-  const payload={v:1,name:rounds[0]?.course||'ゴルフデータ',rounds};
+  // ラウンド一覧を表示
+  const list=document.getElementById('share-round-list');
+  const wrap=document.getElementById('share-code-wrap');
+  wrap.style.display='none';
+  list.innerHTML=rounds.map(r=>{
+    let sc=0,par=0,played=0;
+    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){sc+=h.shots.length;par+=h.par;played++;}});
+    const vs=sc-par;const vsStr=sc&&played?(vs===0?'E':vs>0?'+'+vs:String(vs)):'';
+    const col=vs<0?'var(--green)':vs>0?'var(--red)':'var(--text-2)';
+    return`<div onclick="generateShareCode('${r.id}')" style="display:flex;align-items:center;padding:12px 14px;border-bottom:0.5px solid var(--border-lt);cursor:pointer;transition:background 0.1s" ontouchstart="this.style.background='#F0EEE8'" ontouchend="this.style.background=''">
+      <div style="flex:1;min-width:0;text-align:left">
+        <div style="font-size:14px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.course||'コース未設定'}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${r.date||''} / ${r.side||''}${played?' · '+played+'H':''}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;margin-left:12px">
+        <div style="font-size:18px;font-weight:700">${sc||'-'}</div>
+        <div style="font-size:11px;font-weight:600;color:${col}">${vsStr}</div>
+      </div>
+      <div style="font-size:11px;color:var(--green);margin-left:8px">›</div>
+    </div>`;
+  }).join('');
+  document.getElementById('share-modal').classList.add('open');
+}
+
+function generateShareCode(roundId){
+  const rounds=loadRounds();
+  const r=rounds.find(x=>x.id===roundId);
+  if(!r){alert('ラウンドが見つかりません。');return;}
   try{
+    const payload={v:2,single:true,round:r};
     const json=JSON.stringify(payload);
-    // TextEncoderでUTF-8→Uint8Array→Base64（日本語対応）
     const bytes=new TextEncoder().encode(json);
     let binary='';
-    bytes.forEach(b=>binary+=String.fromCharCode(b));
+    // チャンクに分けてfromCharCodeを呼ぶ（大きなデータでスタックオーバーフロー防止）
+    const chunk=1024;
+    for(let i=0;i<bytes.length;i+=chunk){
+      binary+=String.fromCharCode(...bytes.subarray(i,i+chunk));
+    }
     const code='GOLF1:'+btoa(binary);
     document.getElementById('share-code-area').value=code;
     document.getElementById('copy-btn').textContent='コードをコピー';
-    document.getElementById('share-modal').classList.add('open');
+    document.getElementById('share-code-wrap').style.display='block';
+    // スクロールしてコードエリアを見せる
+    setTimeout(()=>{
+      const wrap=document.getElementById('share-code-wrap');
+      wrap.scrollIntoView({behavior:'smooth',block:'nearest'});
+    },50);
   }catch(e){
-    alert('データの生成に失敗しました。データ量が多すぎる可能性があります。');
+    alert('コードの生成に失敗しました: '+e.message);
   }
 }
 
@@ -2321,9 +2361,17 @@ function importData(){
     for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
     const json=new TextDecoder().decode(bytes);
     const payload=JSON.parse(json);
-    if(!payload.rounds||!Array.isArray(payload.rounds))throw new Error('invalid');
+    // v2: 1ラウンド共有 / v1: 全ラウンド共有（後方互換）
+    let rounds=[];
+    if(payload.single&&payload.round){
+      rounds=[payload.round];
+    }else if(payload.rounds&&Array.isArray(payload.rounds)){
+      rounds=payload.rounds;
+    }else{
+      throw new Error('invalid');
+    }
     closeImportModal();
-    openViewer(payload);
+    openViewer({rounds});
   }catch(e){
     errEl.style.display='block';
   }
