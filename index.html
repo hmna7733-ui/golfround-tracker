@@ -2303,8 +2303,9 @@ function generateShareLink(roundId){
     for(let i=0;i<bytes.length;i+=1024){
       binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+1024,bytes.length)));
     }
-    const b64=btoa(binary);
-    const url=location.origin+location.pathname+'?r='+encodeURIComponent(b64);
+    // Base64をURLセーフ文字に変換（+→- /→_ =除去）
+    const b64safe=btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+    const url=location.origin+location.pathname+'?r='+b64safe;
     document.getElementById('share-link-input').value=url;
     document.getElementById('copy-link-btn').textContent='🔗 リンクをコピー';
     document.getElementById('share-link-wrap').style.display='block';
@@ -2833,22 +2834,29 @@ initHoles();
 updateClubsFromProfile();
 
 // URLパラメータ ?r= があれば共有データとして閲覧画面を開く
-(function(){
+// DOMContentLoaded後に実行することで確実にDOM操作できる
+document.addEventListener('DOMContentLoaded', function(){
   try{
     const params=new URLSearchParams(location.search);
     const rParam=params.get('r');
     if(!rParam)return;
-    const binary=atob(decodeURIComponent(rParam));
+    // デコード
+    // URLセーフBase64を通常のBase64に戻す（-→+ _→/ パディング追加）
+    const b64=rParam.replace(/-/g,'+').replace(/_/g,'/');
+    const padded=b64+('=='.slice(0,(4-b64.length%4)%4));
+    const binary=atob(padded);
     const bytes=new Uint8Array(binary.length);
     for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
     const round=JSON.parse(new TextDecoder().decode(bytes));
     if(round&&round.id){
-      // URLをきれいにしてから閲覧画面を開く
       history.replaceState(null,'',location.pathname);
-      openViewer({rounds:[round]});
+      // 少し遅延させてINIT処理が全て完了してから開く
+      setTimeout(()=>openViewer({rounds:[round]}), 100);
     }
-  }catch(e){/* 無効なパラメータは無視 */}
-})();
+  }catch(e){
+    console.warn('共有URLの処理失敗:', e.message);
+  }
+});
 </script>
 </body>
 </html>
