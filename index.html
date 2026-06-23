@@ -310,6 +310,15 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     </div>
   </div>
   <div class="home-body">
+    <!-- プレーヤー選択バナー -->
+    <div id="player-banner" onclick="openPlayerSelect()" style="display:flex;align-items:center;background:var(--card);border:0.5px solid var(--border);border-radius:14px;padding:12px 16px;margin-bottom:10px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.04);transition:opacity 0.1s" ontouchstart="this.style.opacity=0.7" ontouchend="this.style.opacity=1">
+      <div style="width:36px;height:36px;border-radius:50%;background:var(--green-lt);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏌️</div>
+      <div style="flex:1;margin-left:12px">
+        <div style="font-size:15px;font-weight:600" id="banner-player-name">プレーヤーを選択</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:1px" id="banner-player-sub">タップして設定・切り替え</div>
+      </div>
+      <div style="font-size:11px;color:var(--green)">切替 ›</div>
+    </div>
     <button class="btn btn-primary" onclick="goTo('s1')">+ 新しいラウンドを開始</button>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
       <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="openAnalysis()">📊 スコア分析</button>
@@ -345,6 +354,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <div class="card">
       <div class="fr" onclick="openDate()"><span class="fr-lbl">日付</span><span class="fr-val set" id="r-date-v">今日</span><span class="fr-arr">›</span></div>
       <div class="fr no-tap"><span class="fr-lbl">ゴルフ場名</span><input id="r-course" type="text" placeholder="コース名を入力" inputmode="text" style="border:none;background:none;font-size:15px;color:var(--text);text-align:right;width:55%;outline:none;font-family:inherit"></div>
+      <div class="fr" onclick="openDrum('ホール数',null,['3H','6H','9H','18H'],'r-holes')"><span class="fr-lbl">ホール数</span><span class="fr-val set" id="r-holes-v">18H</span><span class="fr-arr">›</span></div>
       <div class="fr" onclick="openDrum('スタート',null,['OUT（1番スタート）','IN（10番スタート）'],'r-side')"><span class="fr-lbl">スタート</span><span class="fr-val set" id="r-side-v">OUT（1番〜）</span><span class="fr-arr">›</span></div>
     </div>
     <div class="sec-lbl">コース状態</div>
@@ -369,7 +379,10 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
 <div id="s2" class="screen">
   <div class="topbar">
     <button class="nav-btn" onclick="goTo('s0')">ホーム</button>
-    <div class="topbar-title" id="ov-course"></div>
+    <div style="flex:1;text-align:center">
+      <div class="topbar-title" id="ov-course" style="font-size:15px"></div>
+      <button onclick="openPlayerSelect()" style="background:none;border:none;font-size:11px;color:var(--green);cursor:pointer;padding:2px 0" id="ov-player-btn">👤 切替</button>
+    </div>
     <div style="display:flex;gap:4px">
       <button class="nav-btn" onclick="editRound()" style="font-size:13px;color:var(--text-2)">編集</button>
       <button class="nav-btn right" onclick="showSummary()">集計</button>
@@ -703,6 +716,36 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
   </div>
 </div>
 
+<!-- PLAYER SELECT MODAL -->
+<div class="modal-overlay" id="player-modal">
+  <div class="modal-box" style="max-height:85vh;overflow-y:auto">
+    <div class="modal-icon">🏌️</div>
+    <div class="modal-title">プレーヤー選択</div>
+    <div id="player-list" style="text-align:left;margin-bottom:12px"></div>
+    <button class="modal-btn primary" onclick="openAddPlayer()">＋ 新しいプレーヤーを追加</button>
+    <button class="modal-btn secondary" onclick="closePlayerModal()">閉じる</button>
+  </div>
+</div>
+
+<!-- ADD PLAYER MODAL -->
+<div class="modal-overlay" id="add-player-modal">
+  <div class="modal-box">
+    <div class="modal-title" id="add-player-title">プレーヤーを追加</div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin:12px 0">
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">名前</label>
+        <input class="profile-input" id="new-player-name" placeholder="例：中田はやと（右）"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">利き手</label>
+        <div style="display:flex;gap:8px">
+          <button id="np-hand-right" class="chip-sel active" onclick="setNewPlayerHand('right',this)">右利き</button>
+          <button id="np-hand-left" class="chip-sel" onclick="setNewPlayerHand('left',this)">左利き</button>
+        </div>
+      </div>
+    </div>
+    <button class="modal-btn primary" onclick="saveNewPlayer()">追加する</button>
+    <button class="modal-btn secondary" onclick="closeAddPlayer()">キャンセル</button>
+  </div>
+</div>
+
 <!-- DELETE CONFIRM MODAL -->
 <div class="modal-overlay" id="delete-modal">
   <div class="modal-box">
@@ -833,7 +876,8 @@ function calcStats(rounds){
 }
 
 function renderHomeStats(){
-  const rounds=loadRounds();
+  const activeId=getActivePlayerId();
+  const rounds=activeId?loadRoundsForPlayer(activeId):loadRounds();
   const st=calcStats(rounds);
   if(!st){
     document.getElementById('hs-rounds').textContent=rounds.length||'0';
@@ -855,8 +899,10 @@ function renderHomeStats(){
 }
 
 function renderHome(){
+  updatePlayerBanner();
   renderHomeStats();
-  const rounds=loadRounds();
+  const activeId=getActivePlayerId();
+  const rounds=activeId?loadRoundsForPlayer(activeId):loadRounds();
   const el=document.getElementById('home-list');
   if(!rounds.length){el.innerHTML='';return;}
   const items=rounds.slice(0,10).map(r=>{
@@ -1132,7 +1178,14 @@ function startRound(){
   R.course=document.getElementById('r-course').value||'コース未設定';
   R.goal=document.getElementById('r-goal').value;
   if(!R.date)R.date=fmtDate(new Date());
-  initHoles();curHole=0;saveCurrentRound();goTo('s2');
+  // プレーヤーIDを紐付け
+  const activeId=getActivePlayerId();
+  if(activeId)R.playerId=activeId;
+  // ホール数に合わせてホールを初期化
+  const holeCount=parseInt((DV['r-holes']||'18H').replace('H',''))||18;
+  R.holeCount=holeCount;
+  initHolesByCount(holeCount);
+  curHole=0;saveCurrentRound();goTo('s2');
 }
 function isIN(){return R.side==='IN';}
 function hNum(idx){return isIN()?(idx<9?idx+10:idx-8):idx+1;}
@@ -1675,7 +1728,8 @@ function openMetricDetail(type){
 
 function renderAnalysis(){
   const el=document.getElementById('analysis-content');
-  const rounds=loadRounds();
+  const activeId=getActivePlayerId();
+  const rounds=activeId?loadRoundsForPlayer(activeId):loadRounds();
   // 全ショットを収集（ペナルティダミー除く）
   const allShots=[];
   const allHoles=[];
@@ -2872,6 +2926,132 @@ function editShotFromS12(roundId,holeIdx,shotIdx){
 }
 
 // saveShot後にs12用の後処理をhook
+// ===== PLAYER MANAGEMENT =====
+const PLAYERS_KEY='golf_players_v1';
+const ACTIVE_PLAYER_KEY='golf_active_player_v1';
+
+function loadPlayers(){
+  try{return JSON.parse(localStorage.getItem(PLAYERS_KEY)||'[]');}catch(e){return [];}
+}
+function savePlayers(players){
+  localStorage.setItem(PLAYERS_KEY,JSON.stringify(players));
+}
+function getActivePlayerId(){
+  return localStorage.getItem(ACTIVE_PLAYER_KEY)||null;
+}
+function setActivePlayerId(id){
+  localStorage.setItem(ACTIVE_PLAYER_KEY,id);
+}
+function getActivePlayer(){
+  const id=getActivePlayerId();
+  if(!id)return null;
+  return loadPlayers().find(p=>p.id===id)||null;
+}
+
+function updatePlayerBanner(){
+  const p=getActivePlayer();
+  const nameEl=document.getElementById('banner-player-name');
+  const subEl=document.getElementById('banner-player-sub');
+  const ovBtn=document.getElementById('ov-player-btn');
+  if(p){
+    if(nameEl)nameEl.textContent=p.name;
+    if(subEl)subEl.textContent=(p.hand==='left'?'左利き':'右利き')+'のデータを記録中';
+    if(ovBtn)ovBtn.textContent='👤 '+p.name;
+  }else{
+    if(nameEl)nameEl.textContent='プレーヤーを選択してください';
+    if(subEl)subEl.textContent='タップして設定・切り替え';
+    if(ovBtn)ovBtn.textContent='👤 切替';
+  }
+}
+
+function openPlayerSelect(){
+  const players=loadPlayers();
+  const activeId=getActivePlayerId();
+  const list=document.getElementById('player-list');
+  if(!players.length){
+    list.innerHTML=`<div style="text-align:center;padding:16px;color:var(--text-2);font-size:14px">プレーヤーがいません。<br>追加してください。</div>`;
+  }else{
+    list.innerHTML=players.map(p=>{
+      const active=p.id===activeId;
+      return`<div style="display:flex;align-items:center;padding:12px 4px;border-bottom:0.5px solid var(--border-lt);gap:12px">
+        <div style="width:36px;height:36px;border-radius:50%;background:${active?'var(--green)':'var(--green-lt)'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🏌️</div>
+        <div style="flex:1;cursor:pointer" onclick="selectPlayer('${p.id}')">
+          <div style="font-size:15px;font-weight:${active?'700':'500'};color:${active?'var(--green)':'var(--text)'}">${p.name}${active?' ✓':''}</div>
+          <div style="font-size:12px;color:var(--text-2)">${p.hand==='left'?'左利き':'右利き'}</div>
+        </div>
+        <button onclick="deletePlayer('${p.id}')" style="background:none;border:none;color:var(--text-3);font-size:18px;cursor:pointer;padding:4px">×</button>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('player-modal').classList.add('open');
+}
+
+function closePlayerModal(){document.getElementById('player-modal').classList.remove('open');}
+
+function selectPlayer(id){
+  setActivePlayerId(id);
+  closePlayerModal();
+  updatePlayerBanner();
+  // プロフィールもこのプレーヤーのものに切り替え
+  const players=loadPlayers();
+  const p=players.find(x=>x.id===id);
+  if(p&&p.profile){
+    // プロフィールはplayer内のものを参照（グローバルは参照用のみ）
+  }
+  renderHome();
+}
+
+function deletePlayer(id){
+  if(!confirm('このプレーヤーを削除しますか？\nラウンドデータは削除されません。'))return;
+  const players=loadPlayers().filter(p=>p.id!==id);
+  savePlayers(players);
+  if(getActivePlayerId()===id){
+    localStorage.removeItem(ACTIVE_PLAYER_KEY);
+    updatePlayerBanner();
+  }
+  openPlayerSelect();
+}
+
+let _newPlayerHand='right';
+function openAddPlayer(){
+  document.getElementById('new-player-name').value='';
+  _newPlayerHand='right';
+  document.getElementById('np-hand-right').classList.add('active');
+  document.getElementById('np-hand-left').classList.remove('active');
+  document.getElementById('add-player-modal').classList.add('open');
+}
+function closeAddPlayer(){document.getElementById('add-player-modal').classList.remove('open');}
+function setNewPlayerHand(hand,el){
+  _newPlayerHand=hand;
+  document.getElementById('np-hand-right').classList.toggle('active',hand==='right');
+  document.getElementById('np-hand-left').classList.toggle('active',hand==='left');
+}
+function saveNewPlayer(){
+  const name=document.getElementById('new-player-name').value.trim();
+  if(!name){alert('名前を入力してください');return;}
+  const players=loadPlayers();
+  const newPlayer={id:'p_'+Date.now(),name,hand:_newPlayerHand,createdAt:new Date().toISOString()};
+  players.push(newPlayer);
+  savePlayers(players);
+  // 自動的に新プレーヤーを選択
+  setActivePlayerId(newPlayer.id);
+  closeAddPlayer();
+  updatePlayerBanner();
+  openPlayerSelect();
+}
+
+// loadRoundsをプレーヤー絞り込み対応に拡張
+function loadRoundsForPlayer(playerId){
+  const all=loadRounds();
+  if(!playerId)return all;
+  return all.filter(r=>r.playerId===playerId||!r.playerId); // 未設定も含む（後方互換）
+}
+
+// ホール数に合わせてinitHoles
+function initHolesByCount(count){
+  holes=Array.from({length:count},(_,i)=>({num:i+1,par:4,dist:0,pin:'',shots:[],note:'',finished:false}));
+}
+
 // SERVICE WORKER
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
@@ -2885,9 +3065,11 @@ if('serviceWorker' in navigator){
 // INIT
 R.date=fmtDate(new Date());
 const dateEl=document.getElementById('r-date-v');if(dateEl)dateEl.textContent=R.date;
-DV['r-side']='OUT（1番スタート）';DV['r-hcp']='0';DV['r-weather']='晴れ';
+DV['r-side']='OUT（1番スタート）';DV['r-hcp']='0';DV['r-weather']='晴れ';DV['r-holes']='18H';
+const holesVEl=document.getElementById('r-holes-v');if(holesVEl)holesVEl.textContent='18H';
 initHoles();
 updateClubsFromProfile();
+updatePlayerBanner();
 
 // URLパラメータ ?r= があれば共有データとして閲覧画面を開く
 // 共有URLパラメータ処理（確実に動作させるため関数化）
