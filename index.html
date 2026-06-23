@@ -931,12 +931,18 @@ function openHistoryDetail(id){
     const LBL={'-3':'アルバトロス','-2':'イーグル','-1':'バーディ','0':'パー','1':'ボギー','2':'ダブルボギー','3':'トリプルボギー'};
     const lbl=LBL[d]||(d>0?'+'+d:d);
     const scoreColor=d<0?'var(--green)':d>0?'var(--red)':'var(--text)';
-    return `<div class="history-hole-row">
-      <div class="history-hole-num">${hNum(i)}</div>
-      <div class="history-hole-par" style="color:var(--text-2)">Par${h.par}</div>
-      <div class="history-hole-score" style="color:${scoreColor}">${s}</div>
-      <div class="history-hole-vs" style="color:${scoreColor};font-size:12px">${lbl}</div>
-      <div class="history-hole-putts">${hp?hp+'パット':''}</div>
+    const shotsHtml=buildHoleShotsHtml(h,hNum(i));
+    const uid=`hd-hole-${i}`;
+    return `<div>
+      <div class="history-hole-row" onclick="toggleHoleDetail('${uid}')" style="cursor:pointer">
+        <div class="history-hole-num">${hNum(i)}</div>
+        <div class="history-hole-par" style="color:var(--text-2)">Par${h.par}</div>
+        <div class="history-hole-score" style="color:${scoreColor}">${s}</div>
+        <div class="history-hole-vs" style="color:${scoreColor};font-size:12px">${lbl}</div>
+        <div class="history-hole-putts">${hp?hp+'パット':''}</div>
+        <div style="font-size:10px;color:var(--green);margin-left:auto">▼</div>
+      </div>
+      <div id="${uid}" style="display:none;padding:4px 16px 8px;background:var(--bg)">${shotsHtml}</div>
     </div>`;
   }).join('');
 
@@ -975,13 +981,21 @@ function openHistoryDetail(id){
   goTo('s7');
 }
 
+function toggleHoleDetail(uid){
+  const el=document.getElementById(uid);
+  if(!el)return;
+  const open=el.style.display==='none';
+  el.style.display=open?'block':'none';
+  const row=el.previousElementSibling;
+  if(row){const arr=row.querySelector('div:last-child');if(arr)arr.textContent=open?'▲':'▼';}
+}
+
 function resumeRound(id){
   const rounds=loadRounds();
   const r=rounds.find(x=>x.id===id);
   if(!r)return;
   R={...r};holes=r.holes.map(h=>({...h,shots:[...(h.shots||[])]}));
   curHole=0;
-  // 最後に記録があるホールを探す
   for(let i=holes.length-1;i>=0;i--){if(holes[i].shots&&holes[i].shots.length){curHole=Math.min(i+1,17);break;}}
   goTo('s2');
 }
@@ -2354,6 +2368,41 @@ function closeImportModal(){document.getElementById('import-modal').classList.re
 // ===== VIEWER（閲覧専用モード） =====
 let viewerData=null;
 
+// ホールのショット詳細HTMLを生成（履歴・閲覧モード共通）
+function buildHoleShotsHtml(h,holeNum){
+  const realShots=h.shots.filter(s=>!s.isPenalty);
+  if(!realShots.length)return '';
+  return realShots.map((s,si)=>{
+    const isPutt=s.club&&s.club.includes('パター');
+    const clubShort=(s.club||'?').replace(/（.*?）/,'');
+    const penShots=h.shots.slice(0,h.shots.indexOf(s)+1).filter(x=>x.isPenalty).length;
+    const shotNum=h.shots.indexOf(s)+1;
+    const tags=[
+      s.lie&&`<span style="background:var(--bg);border-radius:5px;padding:1px 6px;font-size:10px;color:var(--text-2)">${s.lie.replace('（砂の上）','').replace('（土）','')}</span>`,
+      s.land&&`<span style="background:var(--bg);border-radius:5px;padding:1px 6px;font-size:10px;color:${s.land.includes('OB')||s.land.includes('ウォーター（1罰打')?'var(--red)':'var(--text-2)'}">${s.land}</span>`,
+      s.acc&&`<span style="background:var(--bg);border-radius:5px;padding:1px 6px;font-size:10px;color:var(--text-2)">${s.acc.slice(0,2)}</span>`,
+      s.impact&&!isPutt&&`<span style="background:var(--bg);border-radius:5px;padding:1px 6px;font-size:10px;color:${s.impact.startsWith('×')?'var(--red)':'var(--text-2)'}">${s.impact.slice(0,5)}</span>`,
+      isPutt&&s.impact&&`<span style="background:var(--blue-lt);border-radius:5px;padding:1px 6px;font-size:10px;color:var(--blue)">${s.impact}</span>`,
+    ].filter(Boolean).join(' ');
+    const distStr=s.dist?`残${s.dist}${s.dist_unit||'y'}`:'';
+    const hitStr=s.hitdist?`→${s.hitdist}y`:'';
+    const cupMark=s.cupIn?'⛳':'';
+    return`<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border-lt)">
+      <div style="width:22px;height:22px;border-radius:50%;background:${isPutt?'var(--blue-lt)':'var(--green-lt)'};color:${isPutt?'var(--blue)':'var(--green-dk)'};font-size:11px;font-weight:600;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${shotNum}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500">${clubShort}${cupMark} <span style="font-weight:400;color:var(--text-2);font-size:12px">${distStr}${hitStr}</span></div>
+        <div style="margin-top:3px;display:flex;flex-wrap:wrap;gap:3px">${tags}</div>
+        ${s.note?`<div style="font-size:11px;color:var(--text-2);margin-top:3px;font-style:italic">${s.note}</div>`:''}
+      </div>
+    </div>`;
+  }).join('')+
+  // ペナルティがあれば末尾に表示
+  h.shots.filter(s=>s.isPenalty).map(s=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:6px 0;background:var(--red-lt);border-radius:4px;margin-top:2px;padding-left:8px">
+      <span style="font-size:11px;color:var(--red)">🚫 ${s.penaltyLabel||'ペナルティ'}</span>
+    </div>`).join('');
+}
+
 function openViewer(payload){
   viewerData=payload;
   const rounds=payload.rounds||[];
@@ -2378,21 +2427,48 @@ function openViewer(payload){
   document.getElementById('viewer-meta').textContent=`${totalR}ラウンド · 閲覧専用`;
 
   // ラウンド一覧
-  const roundRows=rounds.map(r=>{
-    let sc=0,par=0,played=0;
-    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){sc+=h.shots.length;par+=h.par;played++;}});
-    const vs=sc-par;
-    const vsStr2=sc&&played?(vs===0?'E':vs>0?'+'+vs:String(vs)):'';
+  const roundRows=rounds.map((r,ri)=>{
+    let sc=0,par=0,played=0,putts=0;
+    const isIN=r.side==='IN';
+    function hNum(idx){return isIN?(idx<9?idx+10:idx-8):idx+1;}
+    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){sc+=h.shots.length;par+=h.par;played++;putts+=h.shots.filter(s=>s.club&&s.club.includes('パター')).length;}});
+    const vs=sc-par;const vsStr=sc&&played?(vs===0?'E':vs>0?'+'+vs:String(vs)):'';
     const col=vs<0?'var(--green)':vs>0?'var(--red)':'var(--text-2)';
-    return`<div style="display:flex;align-items:center;padding:13px 0;border-bottom:0.5px solid var(--border-lt)">
-      <div style="flex:1;min-width:0">
-        <div style="font-size:15px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.course||'-'}</div>
-        <div style="font-size:12px;color:var(--text-2);margin-top:2px">${r.date||''} / ${r.side||''}${played?' · '+played+'H':''}</div>
+    const avgP=played?Math.round(putts/played*10)/10:'-';
+    // ホール別行
+    const holeRows=(r.holes||[]).map((h,i)=>{
+      if(!h.shots||!h.shots.length)return '';
+      const s=h.shots.length;const d=s-h.par;
+      const scoreColor=d<0?'var(--green)':d>0?'var(--red)':'var(--text)';
+      const LBL={'-3':'AL','-2':'EG','-1':'BD','0':'PAR','1':'BOG','2':'DBL','3':'TRI'};
+      const lbl=LBL[d]||(d>0?'+'+d:d);
+      const hp=h.shots.filter(x=>x.club&&x.club.includes('パター')).length;
+      const shotsHtml=buildHoleShotsHtml(h,hNum(i));
+      const uid=`vw-${ri}-hole-${i}`;
+      return`<div>
+        <div onclick="toggleHoleDetail('${uid}')" style="display:flex;align-items:center;padding:10px 14px;border-bottom:0.5px solid var(--border-lt);cursor:pointer;gap:8px">
+          <div style="width:28px;font-weight:600;font-size:13px;color:var(--text-2)">${hNum(i)}</div>
+          <div style="font-size:12px;color:var(--text-2);width:36px">Par${h.par}</div>
+          <div style="font-size:16px;font-weight:700;color:${scoreColor};width:24px">${s}</div>
+          <div style="font-size:12px;color:${scoreColor};flex:1">${lbl}</div>
+          <div style="font-size:12px;color:var(--text-2)">${hp?hp+'パット':''}</div>
+          <div style="font-size:10px;color:var(--green)">▼</div>
+        </div>
+        <div id="${uid}" style="display:none;padding:4px 14px 8px;background:var(--bg)">${shotsHtml}</div>
+      </div>`;
+    }).join('');
+    return`<div style="border-bottom:1.5px solid var(--border);margin-bottom:12px;padding-bottom:12px">
+      <div style="display:flex;align-items:center;padding:12px 14px 10px">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:15px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.course||'-'}</div>
+          <div style="font-size:12px;color:var(--text-2);margin-top:2px">${r.date||''} / ${r.side||''}${played?' · '+played+'H':''} · パット${avgP}/H</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0;margin-left:12px">
+          <div style="font-size:22px;font-weight:700;letter-spacing:-0.03em">${sc||'-'}</div>
+          <div style="font-size:12px;font-weight:600;color:${col}">${vsStr}</div>
+        </div>
       </div>
-      <div style="text-align:right;flex-shrink:0;margin-left:12px">
-        <div style="font-size:20px;font-weight:700;letter-spacing:-0.03em">${sc||'-'}</div>
-        <div style="font-size:12px;font-weight:600;color:${col}">${vsStr2}</div>
-      </div>
+      ${holeRows?`<div class="card" style="margin:0 14px">${holeRows}</div>`:''}
     </div>`;
   }).join('');
 
