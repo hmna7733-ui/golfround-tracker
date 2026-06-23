@@ -674,25 +674,32 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
   <div class="modal-box" style="max-height:85vh;overflow-y:auto">
     <div class="modal-icon">📤</div>
     <div class="modal-title">ラウンドを共有する</div>
-    <div style="font-size:13px;color:var(--text-2);margin-bottom:12px">共有するラウンドを選んでください。リンクをLINEで送るだけで相手が見られます。</div>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:12px">共有するラウンドを選んでください。データファイルをLINEで送り、相手がアップロードして見ます。</div>
     <div id="share-round-list" style="text-align:left;max-height:260px;overflow-y:auto;border:0.5px solid var(--border);border-radius:10px;margin-bottom:8px"></div>
     <div id="share-link-wrap" style="display:none;margin-bottom:8px">
-      <div style="font-size:12px;color:var(--text-2);margin-bottom:6px">👇 このリンクをLINEやメッセージで送ってください</div>
-      <div id="share-link-copied" style="display:none;background:var(--green-lt);border-radius:10px;padding:14px;text-align:center;color:var(--green-dk);font-weight:500;font-size:14px">✓ リンクをコピーしました！<br><span style="font-size:12px;font-weight:400;opacity:0.8;margin-top:4px;display:block">LINEやメッセージに貼り付けて送ってください</span></div>
-      <input id="share-link-input" readonly style="width:100%;border:0.5px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;background:var(--bg);color:var(--text-3);outline:none;font-family:monospace;word-break:break-all;display:block">
-      <button class="modal-btn primary" onclick="copyShareLink()" id="copy-link-btn" style="margin-top:8px">🔗 リンクをコピー</button>
+      <div style="background:var(--green-lt);border-radius:10px;padding:14px;text-align:center;color:var(--green-dk)">
+        <div style="font-size:15px;font-weight:600;margin-bottom:4px">✓ ファイルをダウンロードしました</div>
+        <div style="font-size:12px;opacity:0.8">このファイルをLINEで送ってください。<br>相手は「📥 友達のデータ」からファイルを開きます。</div>
+      </div>
     </div>
     <button class="modal-btn secondary" onclick="closeShareModal()">閉じる</button>
   </div>
 </div>
 
-<!-- インポートモーダル（URL方式では不要：案内のみ） -->
+<!-- インポートモーダル -->
 <div class="modal-overlay" id="import-modal">
   <div class="modal-box">
     <div class="modal-icon">📥</div>
     <div class="modal-title">友達のデータを見る</div>
-    <div class="modal-sub">友達から送られてきたリンクをタップするだけで見られます。<br><br>リンクが届いていない場合は友達に「📤 データを共有」から送ってもらってください。</div>
-    <button class="modal-btn secondary" onclick="closeImportModal()">閉じる</button>
+    <div style="font-size:13px;color:var(--text-2);margin-bottom:16px">友達から送られてきたファイル（.json）を選択してください</div>
+    <label style="display:block;background:var(--bg);border:1.5px dashed var(--border);border-radius:12px;padding:20px;text-align:center;cursor:pointer">
+      <div style="font-size:28px;margin-bottom:6px">📁</div>
+      <div style="font-size:14px;font-weight:500;color:var(--green)">ファイルを選択</div>
+      <div style="font-size:12px;color:var(--text-2);margin-top:4px">タップしてファイルを開く</div>
+      <input type="file" accept=".json" id="import-file-input" style="display:none" onchange="loadImportFile(this)">
+    </label>
+    <div id="import-error" style="color:var(--red);font-size:13px;margin-top:8px;display:none">ファイルが正しくありません。ゴルフ記録アプリから共有されたファイルを選択してください。</div>
+    <button class="modal-btn secondary" onclick="closeImportModal()" style="margin-top:12px">キャンセル</button>
   </div>
 </div>
 
@@ -2271,8 +2278,8 @@ function renderAnalysis(){
 function openShareModal(){
   const rounds=loadRounds();
   if(!rounds.length){alert('共有するラウンドデータがありません。');return;}
-  const list=document.getElementById('share-round-list');
   document.getElementById('share-link-wrap').style.display='none';
+  const list=document.getElementById('share-round-list');
   list.innerHTML=rounds.map(r=>{
     let sc=0,par=0,played=0;
     if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){sc+=h.shots.length;par+=h.par;played++;}});
@@ -2287,7 +2294,7 @@ function openShareModal(){
         <div style="font-size:18px;font-weight:700">${sc||'-'}</div>
         <div style="font-size:11px;font-weight:600;color:${col}">${vsStr}</div>
       </div>
-      <div style="font-size:12px;color:var(--green);margin-left:8px">›</div>
+      <div style="font-size:12px;color:var(--green);margin-left:8px">📥</div>
     </div>`;
   }).join('');
   document.getElementById('share-modal').classList.add('open');
@@ -2297,90 +2304,52 @@ function generateShareLink(roundId){
   const rounds=loadRounds();
   const r=rounds.find(x=>x.id===roundId);
   if(!r)return;
-  // コピー済み表示をリセット
-  const copiedMsg=document.getElementById('share-link-copied');
-  const btn=document.getElementById('copy-link-btn');
-  const input=document.getElementById('share-link-input');
-  if(copiedMsg)copiedMsg.style.display='none';
-  if(btn)btn.style.display='block';
-  if(input)input.style.display='block';
   try{
-    const json=JSON.stringify(r);
-    const bytes=new TextEncoder().encode(json);
-    let binary='';
-    for(let i=0;i<bytes.length;i+=1024){
-      binary+=String.fromCharCode(...bytes.subarray(i,Math.min(i+1024,bytes.length)));
-    }
-    // Base64をURLセーフ文字に変換（+→- /→_ =除去）
-    const b64safe=btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
-    const base=location.origin+location.pathname.replace(/\/index\.html$/,'/');
-    const url=base+'?r='+b64safe;
-    document.getElementById('share-link-input').value=url;
-    document.getElementById('copy-link-btn').textContent='🔗 リンクをコピー';
+    const json=JSON.stringify({v:2,round:r},null,2);
+    const blob=new Blob([json],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    const filename='golf_'+(r.course||'round').replace(/[^\w\u3040-\u9fff]/g,'_')+'_'+(r.date||'').replace(/\//g,'')+'.json';
+    a.href=url;a.download=filename;
+    document.body.appendChild(a);a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
     document.getElementById('share-link-wrap').style.display='block';
-    setTimeout(()=>document.getElementById('share-link-wrap').scrollIntoView({behavior:'smooth',block:'nearest'}),50);
-  }catch(e){alert('リンクの生成に失敗しました。');}
+  }catch(e){alert('ダウンロードに失敗しました: '+e.message);}
 }
 
-function copyShareLink(){
-  const input=document.getElementById('share-link-input');
-  const btn=document.getElementById('copy-link-btn');
-  const copiedMsg=document.getElementById('share-link-copied');
-  const url=input.value;
-  const onCopied=()=>{
-    input.style.display='none';
-    btn.style.display='none';
-    copiedMsg.style.display='block';
+function loadImportFile(input){
+  const file=input.files[0];
+  if(!file)return;
+  const errEl=document.getElementById('import-error');
+  errEl.style.display='none';
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const payload=JSON.parse(e.target.result);
+      let round=null;
+      if(payload.v===2&&payload.round) round=payload.round;
+      else if(payload.id&&payload.holes) round=payload;
+      if(!round)throw new Error('invalid');
+      closeImportModal();
+      openViewer({rounds:[round]});
+    }catch(err){
+      errEl.style.display='block';
+    }
   };
-  if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(url).then(onCopied).catch(()=>{fallbackCopyLink(input);onCopied();});
-  }else{
-    fallbackCopyLink(input);onCopied();
-  }
-}
-function fallbackCopyLink(input){
-  input.style.display='block';
-  input.select();input.setSelectionRange(0,99999);
-  document.execCommand('copy');
+  reader.readAsText(file);
+  input.value='';
 }
 
 function closeShareModal(){document.getElementById('share-modal').classList.remove('open');}
-
 function openImportModal(){
-  document.getElementById('import-code-area').value='';
-  document.getElementById('import-error').style.display='none';
+  const errEl=document.getElementById('import-error');
+  if(errEl)errEl.style.display='none';
+  const fi=document.getElementById('import-file-input');
+  if(fi)fi.value='';
   document.getElementById('import-modal').classList.add('open');
 }
-
 function closeImportModal(){document.getElementById('import-modal').classList.remove('open');}
-
-function importData(){
-  // 貼り付けたコードから空白・改行・全角スペースを全て除去
-  const raw=document.getElementById('import-code-area').value
-    .replace(/[\s\u3000\u00a0]/g,''); // 半角・全角・改行・タブ全除去
-  const errEl=document.getElementById('import-error');
-  errEl.style.display='none';
-  errEl.textContent='コードが正しくありません。もう一度確認してください。';
-  if(!raw){errEl.style.display='block';return;}
-  try{
-    if(!raw.startsWith('GOLF1:'))throw new Error('invalid prefix');
-    const b64=raw.slice(6);
-    const binary=atob(b64);
-    const bytes=new Uint8Array(binary.length);
-    for(let i=0;i<binary.length;i++)bytes[i]=binary.charCodeAt(i);
-    const json=new TextDecoder().decode(bytes);
-    const payload=JSON.parse(json);
-    let rounds=[];
-    if(payload.single&&payload.round) rounds=[payload.round];
-    else if(payload.rounds&&Array.isArray(payload.rounds)) rounds=payload.rounds;
-    else throw new Error('invalid structure');
-    closeImportModal();
-    openViewer({rounds});
-  }catch(e){
-    errEl.textContent='コードが正しくありません（'+e.message+'）。再度コピーして貼り付けてください。';
-    errEl.style.display='block';
-  }
-}
 
 // ===== VIEWER（閲覧専用モード） =====
 let viewerData=null;
