@@ -2994,9 +2994,8 @@ function getClubList(){
 // プロフィール画面を描画
 function renderProfilePage(){
   const p=loadProfile()||{};
-  const clubs=(p.clubs||DEFAULT_CLUBS).map(c=>({...c}));
-  // 足りないクラブをDEFAULTで補完
-  DEFAULT_CLUBS.forEach(dc=>{if(!clubs.find(c=>c.id===dc.id))clubs.push({...dc});});
+  // 保存済みクラブがあればそのまま使う（削除したクラブはDEFAULTで補完しない）
+  const clubs=(p.clubs&&p.clubs.length?p.clubs:DEFAULT_CLUBS).map(c=>({...c}));
 
   const clubRows=clubs.map((c,i)=>{
     const isPT=c.id==='PT';
@@ -3837,8 +3836,8 @@ function selectPlayerAndBack(id){
 let _pfTemp={}; // プレーヤーフォームの一時データ
 
 function renderPlayerForm(p){
+  // 保存済みクラブがあればそのまま使う（削除したクラブはDEFAULTで補完しない）
   const clubs=(p&&p.clubs&&p.clubs.length)?p.clubs.map(c=>({...c})):DEFAULT_CLUBS.map(c=>({...c}));
-  DEFAULT_CLUBS.forEach(dc=>{if(!clubs.find(c=>c.id===dc.id))clubs.push({...dc});});
   _pfTemp={
     hand:p&&p.hand?p.hand:'right',
     ballFlight:p&&p.ballFlight?p.ballFlight:'',
