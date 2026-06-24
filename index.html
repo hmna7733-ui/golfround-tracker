@@ -3228,6 +3228,38 @@ function saveProfile(){
   saveProfileData(p);
   // clubsグローバルを更新
   updateClubsFromProfile();
+
+  // プロフィールの人をプレーヤーリストに自動登録・同期
+  if(p.name){
+    const players=loadPlayers();
+    const existing=players.find(x=>x.name===p.name);
+    const playerData={
+      name:p.name,
+      hand:p.hand||'right',
+      handicap:p.handicap||'',
+      goalScore:p.goalScore||'',
+      ballFlight:p.ballFlight||'',
+      golfHistory:p.golfHistory||'',
+      roundFreq:p.roundFreq||'',
+      practiceFreq:p.practiceFreq||'',
+      weaknesses:p.weaknesses||[],
+      clubs:p.clubs||[],
+    };
+    if(existing){
+      // 既存プレーヤーを情報同期
+      Object.assign(existing,playerData);
+      savePlayers(players);
+      setActivePlayerId(existing.id);
+    }else{
+      // 新規登録
+      const newP={id:'p_'+Date.now(),...playerData,createdAt:new Date().toISOString()};
+      players.unshift(newP); // 先頭に追加
+      savePlayers(players);
+      setActivePlayerId(newP.id);
+    }
+    updatePlayerBanner();
+  }
+
   goTo('s0');
 }
 
