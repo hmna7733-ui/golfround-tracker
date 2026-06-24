@@ -320,9 +320,10 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
       <div style="font-size:11px;color:var(--green)">切替 ›</div>
     </div>
     <button class="btn btn-primary" onclick="goTo('s1')">+ 新しいラウンドを開始</button>
+    <button class="btn btn-secondary" style="margin-top:8px;font-size:14px;padding:13px 8px" onclick="openAnalysis()">📊 スコア分析</button>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
-      <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="openAnalysis()">📊 スコア分析</button>
       <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="goTo('s13')">👤 プレーヤー</button>
+      <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="goToCompanionFromHome()">🤝 同伴者</button>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">
       <button class="btn btn-secondary" style="margin-top:0;font-size:14px;padding:13px 8px" onclick="openShareModal()">📤 データを共有</button>
@@ -375,7 +376,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <div class="sec-lbl">同伴者</div>
     <div class="card" id="companion-card">
       <div id="companion-list-setup" style="padding:4px 0"></div>
-      <div class="fr" onclick="goTo('s14')" style="color:var(--green)">
+      <div class="fr" onclick="s14BackDest='s1';goTo('s14')" style="color:var(--green)">
         <span class="fr-lbl" style="color:var(--green)">＋ 同伴者を設定・変更</span>
         <span class="fr-arr" style="color:var(--green)">›</span>
       </div>
@@ -715,7 +716,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
 <!-- COMPANION SETUP s14 -->
 <div id="s14" class="screen">
   <div class="topbar">
-    <button class="nav-btn" id="s14-back-btn" onclick="goTo('s1')">← 戻る</button>
+    <button class="nav-btn" id="s14-back-btn" onclick="goTo(s14BackDest||'s1')">← 戻る</button>
     <div class="topbar-title">同伴者</div>
     <button class="nav-btn right" onclick="openAddCompanion()">＋ 追加</button>
   </div>
@@ -3865,6 +3866,13 @@ function deletePlayerFromForm(){
 }
 
 // ===== COMPANION SETUP SCREEN (s14) =====
+let s14BackDest='s1'; // s14の戻り先（s0=ホーム or s1=ラウンド設定）
+
+function goToCompanionFromHome(){
+  s14BackDest='s0';
+  goTo('s14');
+}
+
 function renderS14(){
   const companions=loadCompanions();
   const selected=R._companions||[];
