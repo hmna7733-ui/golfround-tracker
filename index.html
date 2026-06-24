@@ -3751,10 +3751,21 @@ let _editingPlayerId=null;
 let _pfHand='right';
 
 function renderS13(){
-  const players=loadPlayers();
+  const rawPlayers=loadPlayers();
   const activeId=getActivePlayerId();
   const el=document.getElementById('s13-content');
   if(!el)return;
+
+  // プロフィール設定の人（名前が一致）を先頭に
+  const prof=loadProfile()||{};
+  const profName=(prof.name||'').trim();
+  const players=profName
+    ? [...rawPlayers].sort((a,b)=>{
+        const aMatch=a.name===profName?-1:0;
+        const bMatch=b.name===profName?-1:0;
+        return aMatch-bMatch;
+      })
+    : rawPlayers;
 
   const rows=players.map(p=>{
     const active=p.id===activeId;
