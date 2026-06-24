@@ -686,31 +686,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <div class="topbar-title" id="s13-add-title">プレーヤーを追加</div>
     <button class="nav-btn right" onclick="savePlayerForm()">保存</button>
   </div>
-  <div class="content">
-    <div class="sec-lbl">基本情報</div>
-    <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
-      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">名前 <span style="color:var(--red)">*</span></label>
-        <input class="profile-input" id="pf-name" placeholder="例：中田はやと"></div>
-      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">利き手</label>
-        <div class="chip-sel-group">
-          <button class="chip-sel active" id="pf-hand-right" onclick="setPfHand('right',this)">右利き</button>
-          <button class="chip-sel" id="pf-hand-left" onclick="setPfHand('left',this)">左利き</button>
-        </div>
-      </div>
-      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">メモ（ニックネームなど）</label>
-        <input class="profile-input" id="pf-note" placeholder="例：左打ちの俺、高校の友達など"></div>
-    </div>
-    <div class="sec-lbl">目標</div>
-    <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
-      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">目標スコア</label>
-        <input class="profile-input" id="pf-goal" placeholder="例：90" inputmode="numeric" type="number"></div>
-      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">ハンディキャップ</label>
-        <input class="profile-input" id="pf-hcp" placeholder="例：18" inputmode="decimal" type="number" step="0.1"></div>
-    </div>
-    <div id="pf-delete-wrap" style="display:none;margin-top:8px">
-      <button class="btn btn-danger" onclick="deletePlayerFromForm()">🗑️ このプレーヤーを削除</button>
-    </div>
-  </div>
+  <div class="content" id="s13-add-content"></div>
 </div>
 
 <!-- COMPANION SETUP s14 -->
@@ -3814,67 +3790,237 @@ function selectPlayerAndBack(id){
   goTo('s13');
 }
 
+// ===== PLAYER FORM (s13-add) =====
+let _pfTemp={}; // プレーヤーフォームの一時データ
+
+function renderPlayerForm(p){
+  const clubs=(p&&p.clubs&&p.clubs.length)?p.clubs.map(c=>({...c})):DEFAULT_CLUBS.map(c=>({...c}));
+  DEFAULT_CLUBS.forEach(dc=>{if(!clubs.find(c=>c.id===dc.id))clubs.push({...dc});});
+  _pfTemp={
+    hand:p&&p.hand?p.hand:'right',
+    ballFlight:p&&p.ballFlight?p.ballFlight:'',
+    golfHistory:p&&p.golfHistory?p.golfHistory:'',
+    roundFreq:p&&p.roundFreq?p.roundFreq:'',
+    practiceFreq:p&&p.practiceFreq?p.practiceFreq:'',
+    weaknesses:p&&p.weaknesses?[...p.weaknesses]:[],
+    clubs
+  };
+  const hand=_pfTemp.hand;
+  const bf=_pfTemp.ballFlight;
+  const gh=_pfTemp.golfHistory;
+  const rf=_pfTemp.roundFreq;
+  const pf=_pfTemp.practiceFreq;
+  const wk=_pfTemp.weaknesses;
+
+  const clubRows=clubs.map((c,i)=>{
+    const isPT=c.id==='PT';
+    return`<div class="club-setting-row" id="pf-club-row-${i}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:700;color:var(--text)">${c.id}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);cursor:pointer">
+            <input type="checkbox" id="pfcu_${i}" ${c.use===false?'':'checked'} style="width:16px;height:16px;accent-color:var(--green)">使用する
+          </label>
+          <button onclick="deletePfClubRow(${i})" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:2px 4px;line-height:1">×</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:${isPT?'0':'6px'}">
+        <input class="club-input" placeholder="クラブ名" value="${c.name||''}" id="pfcn_${i}" style="flex:3;min-width:0">
+        <div style="flex:1;min-width:52px;max-width:72px;position:relative">
+          <input class="club-input" placeholder="フル" value="${c.carry||''}" id="pfcc_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+      </div>
+      ${isPT?'':`<div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11px;color:var(--text-3);width:56px;text-align:right;flex-shrink:0">3/4 swing</span>
+        <div style="flex:1;position:relative">
+          <input class="club-input" placeholder="3/4" value="${c.carry3q||''}" id="pfc3q_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+        <div style="flex:1;position:relative">
+          <input class="club-input" placeholder="1/2" value="${c.carry12||''}" id="pfc12_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+      </div>`}
+    </div>`;
+  }).join('');
+
+  document.getElementById('s13-add-content').innerHTML=`
+    <div class="sec-lbl">基本情報</div>
+    <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">名前 <span style="color:var(--red)">*</span></label>
+        <input class="profile-input" id="pf-name" value="${p&&p.name?p.name:''}" placeholder="例：中田はやと"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">利き手</label>
+        <div class="chip-sel-group">
+          <button class="chip-sel ${hand==='right'?'active':''}" onclick="selChipPf(this,'hand','right')">右利き</button>
+          <button class="chip-sel ${hand==='left'?'active':''}" onclick="selChipPf(this,'hand','left')">左利き</button>
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">ハンディキャップ</label>
+        <input class="profile-input" id="pf-hcp" value="${p&&p.handicap?p.handicap:''}" placeholder="例：18" inputmode="decimal" type="number" step="0.1"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">目標スコア（18H）</label>
+        <input class="profile-input" id="pf-goal" value="${p&&p.goalScore?p.goalScore:''}" placeholder="例：90" inputmode="numeric" type="number"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">メモ</label>
+        <input class="profile-input" id="pf-note" value="${p&&p.note?p.note:''}" placeholder="例：職場の同僚など"></div>
+    </div>
+    <div class="sec-lbl">スウィング情報</div>
+    <div class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">持ち球</label>
+        <div class="chip-sel-group">
+          ${['draw','fade','straight','hook','slice'].map(v=>`<button class="chip-sel ${bf===v?'active':''}" onclick="selChipPf(this,'ballFlight','${v}')">${{draw:'ドロー',fade:'フェード',straight:'ストレート',hook:'フック',slice:'スライス'}[v]}</button>`).join('')}
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:6px">自覚している弱点</label>
+        <div class="chip-sel-group">
+          ${['パット','アプローチ','バンカー','ドライバー','アイアン','傾斜地','プレッシャー下','風の影響','ショートホール','距離感'].map(w=>`<button class="chip-sel ${wk.includes(w)?'active':''}" onclick="togglePfWeakness(this,'${w}')">${w}</button>`).join('')}
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">ゴルフ歴</label>
+        <div class="chip-sel-group">
+          ${['1年未満','1〜3年','3〜5年','5〜10年','10年以上'].map(y=>`<button class="chip-sel ${gh===y?'active':''}" onclick="selChipPf(this,'golfHistory','${y}')">${y}</button>`).join('')}
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">月間ラウンド数</label>
+        <div class="chip-sel-group">
+          ${['月1以下','月2〜3','週1','週2以上'].map(r=>`<button class="chip-sel ${rf===r?'active':''}" onclick="selChipPf(this,'roundFreq','${r}')">${r}</button>`).join('')}
+        </div>
+      </div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">練習頻度</label>
+        <div class="chip-sel-group">
+          ${['ほぼしない','月数回','週1','週2以上'].map(r=>`<button class="chip-sel ${pf===r?'active':''}" onclick="selChipPf(this,'practiceFreq','${r}')">${r}</button>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="sec-lbl">クラブ設定</div>
+    <div style="font-size:12px;color:var(--text-2);padding:0 4px 8px;line-height:1.5">「使う」チェックを外すと入力に出てきません。</div>
+    <div class="card" style="padding:4px 16px" id="pf-club-list-card">${clubRows}</div>
+    <button onclick="addPfClubRow()" class="btn btn-secondary" style="margin-top:8px;font-size:14px;padding:12px">＋ クラブを追加</button>
+    ${_editingPlayerId?'<div style="margin-top:16px"><button class="btn btn-danger" onclick="deletePlayerFromForm()">🗑️ このプレーヤーを削除</button></div>':''}
+    <div style="height:calc(var(--safe-bot,0px)+24px)"></div>
+  `;
+}
+
+function selChipPf(el,key,val){
+  el.parentElement.querySelectorAll('.chip-sel').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  _pfTemp[key]=val;
+}
+
+function togglePfWeakness(el,val){
+  if(!_pfTemp.weaknesses)_pfTemp.weaknesses=[];
+  const idx=_pfTemp.weaknesses.indexOf(val);
+  if(idx>=0){_pfTemp.weaknesses.splice(idx,1);el.classList.remove('active');}
+  else{_pfTemp.weaknesses.push(val);el.classList.add('active');}
+}
+
+function syncPfClubsFromDOM(){
+  (_pfTemp.clubs||[]).forEach((c,i)=>{
+    const nm=document.getElementById('pfcn_'+i);if(nm)c.name=nm.value;
+    const cc=document.getElementById('pfcc_'+i);if(cc)c.carry=cc.value;
+    const c3=document.getElementById('pfc3q_'+i);if(c3)c.carry3q=c3.value;
+    const c1=document.getElementById('pfc12_'+i);if(c1)c.carry12=c1.value;
+    const cu=document.getElementById('pfcu_'+i);if(cu)c.use=cu.checked;
+  });
+}
+
+function addPfClubRow(){
+  syncPfClubsFromDOM();
+  if(!_pfTemp.clubs)_pfTemp.clubs=[];
+  _pfTemp.clubs.push({id:'C'+(Date.now()%10000),name:'',carry:'',carry3q:'',carry12:'',use:true});
+  reRenderPfClubList();
+  setTimeout(()=>{const el=document.getElementById('s13-add');if(el)el.scrollTop=el.scrollHeight;},50);
+}
+
+function deletePfClubRow(idx){
+  syncPfClubsFromDOM();
+  _pfTemp.clubs.splice(idx,1);
+  reRenderPfClubList();
+}
+
+function reRenderPfClubList(){
+  const clubs=_pfTemp.clubs||[];
+  const card=document.getElementById('pf-club-list-card');
+  if(!card)return;
+  card.innerHTML=clubs.map((c,i)=>{
+    const isPT=c.id==='PT';
+    return`<div class="club-setting-row" id="pf-club-row-${i}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:700">${c.id}</div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <label style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-2);cursor:pointer">
+            <input type="checkbox" id="pfcu_${i}" ${c.use===false?'':'checked'} style="width:16px;height:16px;accent-color:var(--green)">使用する
+          </label>
+          <button onclick="deletePfClubRow(${i})" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:2px 4px;line-height:1">×</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-bottom:${isPT?'0':'6px'}">
+        <input class="club-input" placeholder="クラブ名" value="${c.name||''}" id="pfcn_${i}" style="flex:3;min-width:0">
+        <div style="flex:1;min-width:52px;max-width:72px;position:relative">
+          <input class="club-input" placeholder="フル" value="${c.carry||''}" id="pfcc_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+      </div>
+      ${isPT?'':`<div style="display:flex;gap:6px;align-items:center">
+        <span style="font-size:11px;color:var(--text-3);width:56px;text-align:right;flex-shrink:0">3/4 swing</span>
+        <div style="flex:1;position:relative">
+          <input class="club-input" placeholder="3/4" value="${c.carry3q||''}" id="pfc3q_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+        <div style="flex:1;position:relative">
+          <input class="club-input" placeholder="1/2" value="${c.carry12||''}" id="pfc12_${i}" style="width:100%;text-align:right;padding-right:14px" inputmode="numeric" type="number">
+          <span style="position:absolute;right:5px;top:50%;transform:translateY(-50%);font-size:10px;color:var(--text-3)">y</span>
+        </div>
+      </div>`}
+    </div>`;
+  }).join('');
+}
+
 function openAddPlayer(){
-  _editingPlayerId=null;_pfHand='right';
+  _editingPlayerId=null;
   document.getElementById('s13-add-title').textContent='プレーヤーを追加';
-  document.getElementById('pf-name').value='';
-  document.getElementById('pf-note').value='';
-  document.getElementById('pf-goal').value='';
-  document.getElementById('pf-hcp').value='';
-  document.getElementById('pf-hand-right').classList.add('active');
-  document.getElementById('pf-hand-left').classList.remove('active');
-  document.getElementById('pf-delete-wrap').style.display='none';
+  renderPlayerForm(null);
   goTo('s13-add');
 }
 
 function openEditPlayer(id){
   _editingPlayerId=id;
-  const players=loadPlayers();
-  const p=players.find(x=>x.id===id);
+  const p=loadPlayers().find(x=>x.id===id);
   if(!p)return;
-  _pfHand=p.hand||'right';
   document.getElementById('s13-add-title').textContent='プレーヤーを編集';
-  document.getElementById('pf-name').value=p.name||'';
-  document.getElementById('pf-note').value=p.note||'';
-  document.getElementById('pf-goal').value=p.goalScore||'';
-  document.getElementById('pf-hcp').value=p.handicap||'';
-  document.getElementById('pf-hand-right').classList.toggle('active',_pfHand==='right');
-  document.getElementById('pf-hand-left').classList.toggle('active',_pfHand==='left');
-  document.getElementById('pf-delete-wrap').style.display='block';
+  renderPlayerForm(p);
   goTo('s13-add');
 }
 
 function setPfHand(hand,el){
-  _pfHand=hand;
-  document.getElementById('pf-hand-right').classList.toggle('active',hand==='right');
-  document.getElementById('pf-hand-left').classList.toggle('active',hand==='left');
+  selChipPf(el,'hand',hand);
 }
 
 function savePlayerForm(){
-  const name=document.getElementById('pf-name').value.trim();
+  const name=(document.getElementById('pf-name')?.value||'').trim();
   if(!name){alert('名前を入力してください');return;}
+  syncPfClubsFromDOM();
+  const data={
+    name,
+    hand:_pfTemp.hand||'right',
+    handicap:(document.getElementById('pf-hcp')?.value||'').trim(),
+    goalScore:(document.getElementById('pf-goal')?.value||'').trim(),
+    note:(document.getElementById('pf-note')?.value||'').trim(),
+    ballFlight:_pfTemp.ballFlight||'',
+    golfHistory:_pfTemp.golfHistory||'',
+    roundFreq:_pfTemp.roundFreq||'',
+    practiceFreq:_pfTemp.practiceFreq||'',
+    weaknesses:_pfTemp.weaknesses||[],
+    clubs:_pfTemp.clubs||[],
+  };
   const players=loadPlayers();
   if(_editingPlayerId){
-    // 編集
     const idx=players.findIndex(p=>p.id===_editingPlayerId);
-    if(idx>=0){
-      players[idx].name=name;
-      players[idx].hand=_pfHand;
-      players[idx].note=document.getElementById('pf-note').value.trim();
-      players[idx].goalScore=document.getElementById('pf-goal').value.trim();
-      players[idx].handicap=document.getElementById('pf-hcp').value.trim();
-    }
+    if(idx>=0)players[idx]={...players[idx],...data};
     savePlayers(players);
   }else{
-    // 新規
-    const p={id:'p_'+Date.now(),name,hand:_pfHand,
-      note:document.getElementById('pf-note').value.trim(),
-      goalScore:document.getElementById('pf-goal').value.trim(),
-      handicap:document.getElementById('pf-hcp').value.trim(),
-      createdAt:new Date().toISOString()};
+    const p={id:'p_'+Date.now(),...data,createdAt:new Date().toISOString()};
     players.push(p);
     savePlayers(players);
-    // 最初のプレーヤーなら自動選択
     if(players.length===1)setActivePlayerId(p.id);
   }
   updatePlayerBanner();
