@@ -424,8 +424,11 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <button class="nav-btn right" onclick="openHoleSetup()">設定</button>
   </div>
   <div style="padding:12px 16px 0">
-    <div class="score-strip" style="margin-bottom:8px">
-      <div><div class="score-big" id="h-big" style="font-size:40px">-</div></div>
+    <div class="score-strip" style="margin-bottom:8px;flex-wrap:wrap;gap:8px">
+      <div style="display:flex;align-items:center;gap:12px;flex:1">
+        <div><div class="score-big" id="h-big" style="font-size:40px">-</div></div>
+        <div id="h-companion-scores" style="flex:1;display:flex;flex-wrap:wrap;gap:5px;align-items:center"></div>
+      </div>
       <div class="score-right"><div class="score-vs" id="h-vspar" style="font-size:17px"></div><div class="score-hint" id="h-vslbl"></div></div>
     </div>
     <div style="font-size:11px;color:var(--text-2);margin-bottom:4px" id="h-meta"></div>
@@ -436,6 +439,7 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
   </div>
   <div class="card" style="margin:0 16px"><div id="shot-list"><div class="empty-shots">ショットを追加してください</div></div></div>
   <button class="add-shot-btn" onclick="openShotForm(-1)">+ ショットを追加</button>
+  <div id="cupin-pending-banner" style="display:none;margin:8px 16px 0;padding:10px 14px;background:var(--amber-lt);border:0.5px solid var(--amber);border-radius:10px;font-size:13px;color:#633806;font-weight:500;line-height:1.4"></div>
   <div style="padding:0 16px;margin-top:4px">
     <div class="card">
       <div style="padding:12px 16px 4px;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.06em">ホールメモ</div>
@@ -1310,9 +1314,9 @@ function startRound(){
   // プレーヤーIDを紐付け
   const activeId=getActivePlayerId();
   if(activeId)R.playerId=activeId;
-  // 同伴者を保存
-  R.companions=R._companions||[];
-  delete R._companions;
+  // 同伴者を保存（_companionsはラウンド中の参照用に残す）
+  R._companions=R._companions||[];
+  R.companions=R._companions;
   // ホール数に合わせてホールを初期化
   const holeCount=parseInt((DV['r-holes']||'18H').replace('H',''))||18;
   R.holeCount=holeCount;
@@ -1371,6 +1375,9 @@ function renderHole(){
   const h=holes[curHole];
   document.getElementById('h-title').textContent=hNum(curHole)+'番ホール';
   document.getElementById('h-meta').textContent=`Par ${h.par}${h.dist?' | '+h.dist+'y':''}${h.layout?' | '+h.layout:''}${h.pin?' | ピン:'+h.pin:''}`;
+  // 未完了バナーをリセット
+  const pendingBanner=document.getElementById('cupin-pending-banner');
+  if(pendingBanner)pendingBanner.style.display='none';
   updateHScore();
   const companions=R._companions||[];
   if(companions.length>0){
@@ -1386,20 +1393,71 @@ function renderHole(){
   document.getElementById('h-note').value=h.note||'';
 }
 function updateHScore(){
-  const h=holes[curHole];const s=h.shots.length;
+  const h=holes[curHole];
+  const companions=R._companions||[];
+  const activeId=getActivePlayerId();
+
+  // メインプレーヤーのショットだけカウント
+  const mainShots=companions.length>0
+    ? h.shots.filter(s=>!s.isPenalty&&(s.shotOwner===null||s.shotOwner===undefined))
+    : h.shots.filter(s=>!s.isPenalty);
+  const s=companions.length>0
+    ? h.shots.filter(s=>!s.isPenalty&&(s.shotOwner===null||s.shotOwner===undefined)).length
+    : h.shots.filter(s=>!s.isPenalty).length;
+
   document.getElementById('h-cnt').textContent=s?s+'打':'0打';
   const big=document.getElementById('h-big');const vp=document.getElementById('h-vspar');const vl=document.getElementById('h-vslbl');
-  if(!s){big.textContent='-';vp.textContent='';vl.textContent='';vp.style.color='';return;}
-  big.textContent=s;const d=s-h.par;
-  const LBL={'-3':'アルバトロス','-2':'イーグル','-1':'バーディ','0':'パー','1':'ボギー','2':'ダブルボギー','3':'トリプルボギー'};
-  vp.textContent=d===0?'E':d>0?'+'+d:d;vp.style.color=d<0?'var(--green)':d===0?'var(--text-2)':'var(--red)';
-  vl.textContent=LBL[d]||(d>0?d+'オーバー':Math.abs(d)+'アンダー');
+  if(!s){big.textContent='-';vp.textContent='';vl.textContent='';vp.style.color='';}
+  else{
+    big.textContent=s;const d=s-h.par;
+    const LBL={'-3':'アルバトロス','-2':'イーグル','-1':'バーディ','0':'パー','1':'ボギー','2':'ダブルボギー','3':'トリプルボギー'};
+    vp.textContent=d===0?'E':d>0?'+'+d:d;vp.style.color=d<0?'var(--green)':d===0?'var(--text-2)':'var(--red)';
+    vl.textContent=LBL[d]||(d>0?d+'オーバー':Math.abs(d)+'アンダー');
+  }
+
+  // 同伴者スコアバッジを更新
+  const csEl=document.getElementById('h-companion-scores');
+  if(csEl){
+    if(companions.length>0){
+      const allCompanions=loadCompanions();
+      csEl.innerHTML=companions.map(cid=>{
+        const c=allCompanions.find(x=>x.id===cid);
+        const cName=c?c.name:'同伴';
+        const cShots=h.shots.filter(s=>s.shotOwner===cid&&!s.isPenalty).length;
+        return `<div style="background:var(--bg);border:0.5px solid var(--border);border-radius:8px;padding:4px 8px;font-size:12px;line-height:1.3;text-align:center">
+          <div style="color:var(--text-2);font-size:10px;white-space:nowrap">${cName}</div>
+          <div style="font-weight:700;font-size:15px;color:var(--text)">${cShots||'-'}</div>
+        </div>`;
+      }).join('');
+      csEl.style.display='flex';
+    }else{
+      csEl.innerHTML='';csEl.style.display='none';
+    }
+  }
 }
 function recalcHitDist(h){
-  h.shots.forEach((s,i)=>{
-    if(i<h.shots.length-1){const nd=h.shots[i+1].dist;s.hitdist=(s.dist&&nd&&s.dist_unit!=='歩数')?Math.max(0,s.dist-nd):null;}
-    else s.hitdist=null;
-  });
+  // プレーヤー別に分けて計算（混在防止）
+  const companions=R._companions||[];
+  if(companions.length>0){
+    // オーナーごとにグループ化して計算
+    const activeId=getActivePlayerId();
+    const allOwners=[activeId,...companions].filter(Boolean);
+    allOwners.forEach(ownerId=>{
+      const ownerKey=ownerId===activeId?null:ownerId;
+      const ownerShots=h.shots.filter(s=>(s.shotOwner||null)===ownerKey&&!s.isPenalty);
+      ownerShots.forEach((s,i)=>{
+        if(i<ownerShots.length-1){const nd=ownerShots[i+1].dist;s.hitdist=(s.dist&&nd&&s.dist_unit!=='歩数')?Math.max(0,s.dist-nd):null;}
+        else s.hitdist=null;
+      });
+    });
+    // ペナルティのhitdistはnull
+    h.shots.filter(s=>s.isPenalty).forEach(s=>{s.hitdist=null;});
+  }else{
+    h.shots.forEach((s,i)=>{
+      if(i<h.shots.length-1){const nd=h.shots[i+1].dist;s.hitdist=(s.dist&&nd&&s.dist_unit!=='歩数')?Math.max(0,s.dist-nd):null;}
+      else s.hitdist=null;
+    });
+  }
 }
 function renderShots(){
   const h=holes[curHole];const el=document.getElementById('shot-list');el.innerHTML='';
@@ -1431,11 +1489,16 @@ function renderShots(){
     div.onclick=()=>openShotForm(i);el.appendChild(div);
   });
 }
-function getLieDefault(h,idx){
-  if(idx===0)return 'ティーグラウンド';
+function getLieDefault(h,idx,owner){
+  // ownerに合致するショットのみ対象（undefined=全員、null=メイン、id=同伴者）
+  const ownerShots=owner===undefined
+    ? h.shots
+    : h.shots.filter(s=>(s.shotOwner||null)===(owner||null));
+  const ownerIdx=ownerShots.length; // 新規追加時の打数位置
+  if(ownerShots.length===0)return 'ティーグラウンド';
   // ペナルティダミーを飛ばして直前の実ショットを探す
   let prev=null;
-  for(let i=idx-1;i>=0;i--){if(!h.shots[i].isPenalty){prev=h.shots[i];break;}}
+  for(let i=ownerShots.length-1;i>=0;i--){if(!ownerShots[i].isPenalty){prev=ownerShots[i];break;}}
   if(!prev||!prev.land)return '';
   const m={
     'フェアウェイ':'フェアウェイ',
@@ -1485,12 +1548,19 @@ function openShotForm(idx){
   sd('sf-shape-v','ストレート');SF.shape='ストレート';
   sd('sf-wind-v','無風');SF.wind='無風';
   sd('sf-slope-v','フラット');SF.slope='フラット';
-  const lieD=getLieDefault(h,shotIdx);if(lieD){sd('sf-lie-v',lieD);SF.lie=lieD;}
+  // 同伴者がいる場合は currentShotOwner のショットのみ参照
+  const companions=R._companions||[];
+  const ownerForRef=companions.length>0?currentShotOwner:undefined;
+  const lieD=getLieDefault(h,shotIdx,ownerForRef);if(lieD){sd('sf-lie-v',lieD);SF.lie=lieD;}
 
   // ④ 番手のデフォルト（新規追加時のみパター引き継ぎを条件付きで適用）
   if(idx<0){
+    // 同伴者がいる場合は該当オーナーのショットだけから直前打を探す
+    const ownerShots=companions.length>0
+      ? h.shots.filter(s=>!s.isPenalty&&(s.shotOwner||null)===(currentShotOwner||null))
+      : h.shots.filter(s=>!s.isPenalty);
     let prevReal=null;
-    for(let i=shotIdx-1;i>=0;i--){if(!h.shots[i].isPenalty){prevReal=h.shots[i];break;}}
+    for(let i=ownerShots.length-1;i>=0;i--){if(!ownerShots[i].isPenalty){prevReal=ownerShots[i];break;}}
     if(prevReal){
       if(prevReal.club&&prevReal.club.includes('パター')&&!prevReal.cupIn){
         // 直前がパター継続中
@@ -1530,17 +1600,38 @@ function openShotForm(idx){
     if(s.hitdist)document.getElementById('sf-hitdist-v').textContent=s.hitdist+'y（計算済み）';
   }
 
-  document.getElementById('sf-title').textContent=idx<0?`${h.shots.length+1}打目`:`${idx+1}打目を編集`;
   // shotOwnerをSFに設定
   if(currentShotOwner)SF.shotOwner=currentShotOwner;
   // プレーヤーバー更新
   updateShotOwnerBar();
-  if(currentShotOwner){
-    const players=loadPlayers();
-    const p=players.find(x=>x.id===currentShotOwner);
-    const name=p?p.name.split('（')[0]:'同伴者';
-    const ownerShots=h.shots.filter(s=>!s.isPenalty&&s.shotOwner===currentShotOwner);
-    document.getElementById('sf-title').textContent=idx<0?`${name}の${ownerShots.length+1}打目`:`${name}の${idx+1}打目を編集`;
+  // タイトル：同伴者がいる場合はプレーヤー別の打数を使う
+  {
+    const companions2=R._companions||[];
+    const activeId2=getActivePlayerId();
+    if(companions2.length>0){
+      const ownerKey=currentShotOwner||null;
+      const players2=loadPlayers();
+      const allComp2=loadCompanions();
+      let name2;
+      if(!currentShotOwner){
+        const mp=players2.find(x=>x.id===activeId2);
+        name2=mp?mp.name:'自分';
+      }else{
+        const cp=allComp2.find(x=>x.id===currentShotOwner);
+        name2=cp?cp.name:'同伴者';
+      }
+      const ownerShots2=h.shots.filter(s=>!s.isPenalty&&(s.shotOwner||null)===ownerKey);
+      if(idx<0){
+        document.getElementById('sf-title').textContent=`${name2}の${ownerShots2.length+1}打目`;
+      }else{
+        // 編集時：対象ショットがそのプレーヤーの何打目かを算出
+        const editedShot=h.shots[idx];
+        const shotNo=ownerShots2.indexOf(editedShot)+1;
+        document.getElementById('sf-title').textContent=`${name2}の${shotNo>0?shotNo:'?'}打目を編集`;
+      }
+    }else{
+      document.getElementById('sf-title').textContent=idx<0?`${h.shots.length+1}打目`:`${idx+1}打目を編集`;
+    }
   }
   // ⑥ 最後にパット判定して表示切り替え
   updatePuttSection();
@@ -1569,7 +1660,9 @@ function saveShot(){
     // 罰打があれば自動挿入
     const pc=penaltyCount(shot.land);
     for(let i=0;i<pc;i++){
-      h.shots.push({isPenalty:true,penaltyLabel:shot.land,club:'',lie:'',note:''});
+      const pen={isPenalty:true,penaltyLabel:shot.land,club:'',lie:'',note:''};
+      if(shot.shotOwner)pen.shotOwner=shot.shotOwner;
+      h.shots.push(pen);
     }
   } else {
     // 編集時: 旧ショットの後ろにあった旧ペナルティ行を削除してから差し替え
@@ -1582,7 +1675,9 @@ function saveShot(){
     // 新しい罰打を再挿入
     const pc=penaltyCount(shot.land);
     for(let i=0;i<pc;i++){
-      h.shots.splice(editShot+1+i,0,{isPenalty:true,penaltyLabel:shot.land,club:'',lie:'',note:''});
+      const pen={isPenalty:true,penaltyLabel:shot.land,club:'',lie:'',note:''};
+      if(shot.shotOwner)pen.shotOwner=shot.shotOwner;
+      h.shots.splice(editShot+1+i,0,pen);
     }
   }
   recalcHitDist(h);saveCurrentRound();
@@ -1601,18 +1696,67 @@ function onCupIn(){
   const h=holes[curHole];
   const shot={...SF,note:document.getElementById('sf-note').value,cupIn:true};
   if(editShot<0)h.shots.push(shot);else h.shots[editShot]=shot;
-  recalcHitDist(h);h.finished=true;saveCurrentRound();
-  const score=h.shots.length; // ペナルティダミー込みの合計
+  recalcHitDist(h);
+
+  // カップイン済みフラグ管理
+  if(!h._cupInDone)h._cupInDone={};
+  const activeId=getActivePlayerId();
+  const ownerKey=currentShotOwner||activeId||'main';
+  h._cupInDone[ownerKey]=true;
+
+  saveCurrentRound();
+
+  // 同伴者がいる場合、全員カップイン済みか確認
+  const companions=R._companions||[];
+  if(companions.length>0){
+    // メインプレーヤー＋全同伴者の全員分チェック
+    const allOwners=[activeId||'main',...companions];
+    const pending=allOwners.filter(id=>!h._cupInDone[id]);
+    if(pending.length>0){
+      // まだカップインしていないプレーヤーがいる
+      const allCompanions=loadCompanions();
+      const players=loadPlayers();
+      const pendingNames=pending.map(id=>{
+        const p=players.find(x=>x.id===id);
+        const c=allCompanions.find(x=>x.id===id);
+        return p?p.name:c?c.name:'未完了';
+      });
+      // s3に戻ってショットリストを更新（goTo('s3')内でrenderHole()が呼ばれる）
+      currentShotOwner=null;
+      goTo('s3');
+      // 未完了プレーヤーを通知
+      const banner=document.getElementById('cupin-pending-banner');
+      if(banner){
+        banner.textContent=`⏳ ${pendingNames.join('、')}のカップインが未完了です`;
+        banner.style.display='block';
+      }
+      return;
+    }
+    // 全員完了
+    const pendingBanner=document.getElementById('cupin-pending-banner');
+    if(pendingBanner)pendingBanner.style.display='none';
+  }
+
+  // 全員完了（または同伴者なし）→ ホール完了
+  currentShotOwner=null;
+  h.finished=true;saveCurrentRound();
+  const score=h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined).length; // メインのスコア
   const diff=score-h.par;
   const labels={'-3':'アルバトロス🦅','-2':'イーグル🦅','-1':'バーディ🐦','0':'パー','1':'ボギー','2':'ダブルボギー','3':'トリプルボギー'};
   const vs=diff===0?'E':diff>0?'+'+diff:String(diff);
   document.getElementById('cupin-title').textContent=`${hNum(curHole)}番ホール完了！`;
   document.getElementById('cupin-sub').textContent=`${score}打 / Par ${h.par}\n${vs}（${labels[diff]||(diff>0?diff+'オーバー':Math.abs(diff)+'アンダー')}）`;
   const nextIdx=curHole+1;
-  document.getElementById('cupin-next-btn').textContent=nextIdx<18?`${hNum(nextIdx)}番ホールへ →`:'集計を見る';
+  document.getElementById('cupin-next-btn').textContent=nextIdx<holes.length?`${hNum(nextIdx)}番ホールへ →`:'集計を見る';
   document.getElementById('cupin-modal').classList.add('open');
 }
-function goNextHole(){closeCupinModal();const n=curHole+1;if(n<holes.length){curHole=n;setupAndGoHole();}else{goTo('s2');setTimeout(()=>showSummary(),120);}}
+function goNextHole(){
+  const pendingBanner=document.getElementById('cupin-pending-banner');
+  if(pendingBanner)pendingBanner.style.display='none';
+  closeCupinModal();
+  const n=curHole+1;
+  if(n<holes.length){curHole=n;setupAndGoHole();}else{goTo('s2');setTimeout(()=>showSummary(),120);}
+}
 function closeCupinModal(){document.getElementById('cupin-modal').classList.remove('open');goTo('s3');}
 
 // ホール選択時：設定モーダルを出してからホール画面へ
@@ -3430,7 +3574,7 @@ function renderShotsByOwner(){
   const activeId=getActivePlayerId();
   const allOwners=[activeId,...companions].filter(Boolean);
 
-  if(!allOwners.length||allOwners.length===1){
+  if(!companions.length){
     // 同伴者なし：従来の表示
     renderShots();return;
   }
@@ -3449,19 +3593,31 @@ function renderShotsByOwner(){
     section.innerHTML=`<div style="padding:8px 16px 4px;font-size:11px;font-weight:600;color:var(--text-2);text-transform:uppercase;letter-spacing:0.06em;background:var(--bg)">${name}（${ownerShots.filter(s=>!s.isPenalty).length}打）</div>`;
 
     const ownerRealShots=ownerShots.filter(s=>!s.isPenalty);
-    if(!ownerRealShots.length){
+    if(!ownerShots.length){
       section.innerHTML+=`<div style="padding:10px 16px;font-size:13px;color:var(--text-3)">未入力</div>`;
     }else{
-      ownerRealShots.forEach((s,i)=>{
+      let realIdx=0; // ペナルティを除いた連番
+      ownerShots.forEach((s)=>{
+        const div=document.createElement('div');
+        div.className='shot-item';
+        // ペナルティダミーの表示
+        if(s.isPenalty){
+          div.style.background='var(--red-lt)';div.style.cursor='default';
+          div.innerHTML=`<div class="shot-num" style="background:var(--red-lt);color:var(--red);border:1px solid var(--red)">罰</div>
+            <div class="shot-body">
+              <div class="shot-club" style="color:var(--red)">🚫 ペナルティ</div>
+              <div class="shot-dtl" style="color:var(--red)">${s.penaltyLabel||''}</div>
+            </div>`;
+          section.appendChild(div);return;
+        }
+        const shotNo=++realIdx;
         const isP=s.club&&s.club.includes('パター');
         const clubShort=(s.club||'-').replace(/（.*?）/,'');
         const du=s.dist_unit||'y';
         const dp=s.hitdist?`${s.hitdist}y打→`:s.dist?`残${s.dist}${du}`:'';
         const cupMark=s.cupIn?'<span style="color:var(--blue)"> ⛳</span>':'';
         const globalIdx=h.shots.indexOf(s);
-        const div=document.createElement('div');
-        div.className='shot-item';
-        div.innerHTML=`<div class="shot-num${isP?' is-putt':''}">${i+1}</div>
+        div.innerHTML=`<div class="shot-num${isP?' is-putt':''}">${shotNo}</div>
           <div class="shot-body">
             <div class="shot-club">${clubShort}${cupMark} <span style="font-weight:400;font-size:13px;color:var(--text-2)">${dp}</span></div>
             <div class="shot-dtl">${[s.lie,s.land||s.pbreak,s.dir].filter(Boolean).join(' → ')}</div>
