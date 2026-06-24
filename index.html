@@ -985,10 +985,13 @@ function calcStats(rounds){
   let bestScore=Infinity,bestPar=0,bestRound=null;
   completed.forEach(r=>{
     let sc=0,par=0,putts=0,hc=0;
+    const _hasC1=(r.companions&&r.companions.length>0);
     r.holes.forEach(h=>{
       if(!h.shots||!h.shots.length)return;
-      sc+=h.shots.length;par+=h.par;hc++;
-      putts+=h.shots.filter(s=>s.club&&s.club.includes('パター')).length;
+      const ms=_hasC1?h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined):h.shots;
+      if(!ms.length)return;
+      sc+=ms.length;par+=h.par;hc++;
+      putts+=ms.filter(s=>s.club&&s.club.includes('パター')).length;
     });
     if(sc>0){
       totalScore+=sc;totalPar+=par;totalPutts+=putts;totalHoles+=hc;count++;
@@ -1035,7 +1038,7 @@ function renderHome(){
   if(!rounds.length){el.innerHTML='';return;}
   const items=rounds.slice(0,10).map(r=>{
     let tot=0,totPar=0,played=0;
-    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){tot+=h.shots.length;totPar+=h.par;played++;}});
+    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){const hasC=(r.companions&&r.companions.length>0);const ms=hasC?h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined):h.shots;if(ms.length){tot+=ms.length;totPar+=h.par;played++;}}});
     const vs=tot-totPar;
     const vsStr=tot&&played?(vs===0?'E':vs>0?'+'+vs:vs):'';
     const vsColor=vs<0?'var(--green)':vs>0?'var(--red)':'var(--text-2)';
@@ -1062,7 +1065,7 @@ function renderHistoryList(){
   if(!rounds.length){el.innerHTML='<div style="padding:40px 16px;text-align:center;color:var(--text-2)">履歴がありません</div>';return;}
   const items=rounds.map(r=>{
     let tot=0,totPar=0,played=0,putts=0;
-    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){tot+=h.shots.length;totPar+=h.par;played++;putts+=h.shots.filter(s=>s.club&&s.club.includes('パター')).length;}});
+    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){const hasC=(r.companions&&r.companions.length>0);const ms=hasC?h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined):h.shots;if(ms.length){tot+=ms.length;totPar+=h.par;played++;putts+=ms.filter(s=>s.club&&s.club.includes('パター')).length;}}});
     const vs=tot-totPar;
     const vsStr=tot&&played?(vs===0?'E':vs>0?'+'+vs:vs):'';
     const vsColor=vs<0?'var(--green)':vs>0?'var(--red)':'var(--text-2)';
@@ -1921,11 +1924,17 @@ function closeDate(save){
 function showSummary(){
   goTo('s5');
   let tot=0,totPar=0,putts=0,fir=0,firDen=0,played=0,birdie=0,par_=0,bogey=0,dbl=0;
+  const _sumCompanions=R._companions||[];
   holes.forEach(h=>{
-    if(!h.shots.length)return;played++;tot+=h.shots.length;totPar+=h.par;
-    putts+=h.shots.filter(s=>s.club&&s.club.includes('パター')).length;
-    if(h.par>3){firDen++;if(h.shots[0]&&h.shots[0].land==='フェアウェイ')fir++;}
-    const d=h.shots.length-h.par;if(d<=-1)birdie++;else if(d===0)par_++;else if(d===1)bogey++;else dbl++;
+    if(!h.shots.length)return;
+    const ms=_sumCompanions.length>0
+      ? h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined)
+      : h.shots;
+    if(!ms.length)return;
+    played++;tot+=ms.length;totPar+=h.par;
+    putts+=ms.filter(s=>s.club&&s.club.includes('パター')).length;
+    if(h.par>3){firDen++;const fr=ms.find(s=>!s.isPenalty);if(fr&&fr.land==='フェアウェイ')fir++;}
+    const d=ms.length-h.par;if(d<=-1)birdie++;else if(d===0)par_++;else if(d===1)bogey++;else dbl++;
   });
   const vs=tot-totPar;
   document.getElementById('sum-content').innerHTML=`
@@ -2078,7 +2087,8 @@ function openMetricDetail(type){
     title='スコア推移';
     const rows=rounds.filter(r=>r.holes&&r.holes.some(h=>h.shots&&h.shots.length)).map(r=>{
       let sc=0,par=0,played=0,putts=0;
-      r.holes&&r.holes.forEach(h=>{if(h.shots&&h.shots.length){sc+=h.shots.length;par+=h.par;played++;putts+=h.shots.filter(s=>s.club&&s.club.includes('パター')).length;}});
+      const _hasC2=(r.companions&&r.companions.length>0);
+      r.holes&&r.holes.forEach(h=>{if(h.shots&&h.shots.length){const ms=_hasC2?h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined):h.shots;if(ms.length){sc+=ms.length;par+=h.par;played++;putts+=ms.filter(s=>s.club&&s.club.includes('パター')).length;}}});
       const vs=sc-par;const vsStr=vs===0?'E':vs>0?'+'+vs:String(vs);
       const col=vs<0?'var(--green)':vs>0?'var(--red)':'var(--text-2)';
       const avgPutt_=played?Math.round(putts/played*100)/100:'-';
@@ -2100,14 +2110,19 @@ function renderAnalysis(){
   const el=document.getElementById('analysis-content');
   const activeId=getActivePlayerId();
   const rounds=activeId?loadRoundsForPlayer(activeId):loadRounds();
-  // 全ショットを収集（ペナルティダミー除く）
+  // 全ショットを収集（ペナルティダミー除く・メインプレーヤーのみ）
   const allShots=[];
   const allHoles=[];
   rounds.forEach(r=>{
     if(!r.holes)return;
+    const hasCompanions=(r.companions&&r.companions.length>0);
     r.holes.forEach(h=>{
       if(!h.shots||!h.shots.length)return;
-      const realShots=h.shots.filter(s=>!s.isPenalty);
+      // 同伴者がいるラウンドはメインプレーヤー（shotOwner===null/undefined）のみ
+      const realShots=hasCompanions
+        ? h.shots.filter(s=>!s.isPenalty&&(s.shotOwner===null||s.shotOwner===undefined))
+        : h.shots.filter(s=>!s.isPenalty);
+      if(!realShots.length)return;
       allHoles.push({...h,shots:realShots,roundDate:r.date,roundCourse:r.course});
       realShots.forEach(s=>allShots.push({...s,holePar:h.par,holeDist:h.dist,roundDate:r.date}));
     });
@@ -2131,7 +2146,14 @@ function renderAnalysis(){
   }).slice(0,5).reverse();
   const trendData=recentRounds.map(r=>{
     let sc=0,par=0;
-    r.holes&&r.holes.forEach(h=>{if(h.shots&&h.shots.length){sc+=h.shots.length;par+=h.par;}});
+    const hasComp=(r.companions&&r.companions.length>0);
+    r.holes&&r.holes.forEach(h=>{
+      if(!h.shots||!h.shots.length)return;
+      const ms=hasComp
+        ? h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined)
+        : h.shots;
+      if(ms.length){sc+=ms.length;par+=h.par;}
+    });
     return{date:r.date,score:sc,par,vs:sc-par,course:r.course};
   });
 
@@ -2438,7 +2460,7 @@ function renderAnalysis(){
 
   // 11. プロフィール活用：目標スコアとの乖離
   if(prof.goalScore&&totalRounds>=3){
-    const recentAvg=recentRounds.slice(-3).reduce((a,r)=>{let s=0;r.holes&&r.holes.forEach(h=>{if(h.shots&&h.shots.length)s+=h.shots.length;});return a+s;},0)/Math.min(3,recentRounds.length);
+    const recentAvg=recentRounds.slice(-3).reduce((a,r)=>{let s=0;const _hasC3=(r.companions&&r.companions.length>0);r.holes&&r.holes.forEach(h=>{if(h.shots&&h.shots.length){const ms=_hasC3?h.shots.filter(x=>x.shotOwner===null||x.shotOwner===undefined):h.shots;s+=ms.length;}});return a+s;},0)/Math.min(3,recentRounds.length);
     const gap=Math.round(recentAvg-parseInt(prof.goalScore));
     if(gap>0){
       insights.push({score:gap*0.05,priority:gap>=10?'A':gap>=5?'B':'C',title:`目標スコア${prof.goalScore}まであと${gap}打`,body:`直近3ラウンドの平均${Math.round(recentAvg)}打。目標の${prof.goalScore}まで${gap}打の差があります。`,point:gap>=10?'パットとティーショットの安定が最短ルート。1ホール1つのミスに絞って対策しましょう。':'もう少し！パーを1〜2個増やすだけで達成できます。ボギーオン＋2パットを徹底してください。'});
@@ -2720,7 +2742,8 @@ function openShareModal(){
   const list=document.getElementById('share-round-list');
   list.innerHTML=rounds.map(r=>{
     let sc=0,par=0,played=0;
-    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){sc+=h.shots.length;par+=h.par;played++;}});
+    const _hasC4=(r.companions&&r.companions.length>0);
+    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){const ms=_hasC4?h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined):h.shots;if(ms.length){sc+=ms.length;par+=h.par;played++;}}});
     const vs=sc-par;const vsStr=sc&&played?(vs===0?'E':vs>0?'+'+vs:String(vs)):'';
     const col=vs<0?'var(--green)':vs>0?'var(--red)':'var(--text-2)';
     return`<div onclick="generateShareLink('${r.id}')" style="display:flex;align-items:center;padding:12px 14px;border-bottom:0.5px solid var(--border-lt);cursor:pointer" ontouchstart="this.style.background='#F0EEE8'" ontouchend="this.style.background=''">
@@ -2867,8 +2890,11 @@ function openViewer(payload){
     let sc=0,par=0,played=0,putts=0;
     r.holes.forEach(h=>{
       if(!h.shots||!h.shots.length)return;
-      sc+=h.shots.length;par+=h.par;played++;
-      putts+=h.shots.filter(s=>s.club&&s.club.includes('パター')).length;
+      const _hasC5=(r.companions&&r.companions.length>0);
+      const ms5=_hasC5?h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined):h.shots;
+      if(!ms5.length)return;
+      sc+=ms5.length;par+=h.par;played++;
+      putts+=ms5.filter(s=>s.club&&s.club.includes('パター')).length;
     });
     if(sc>0){totalR++;totalSc+=sc;totalPar+=par;totalPutt+=putts;totalH+=played;}
   });
@@ -2885,18 +2911,22 @@ function openViewer(payload){
     let sc=0,par=0,played=0,putts=0;
     const isIN=r.side==='IN';
     function hNum(idx){return isIN?(idx<9?idx+10:idx-8):idx+1;}
-    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){sc+=h.shots.length;par+=h.par;played++;putts+=h.shots.filter(s=>s.club&&s.club.includes('パター')).length;}});
+    const _hasC6=(r.companions&&r.companions.length>0);
+    if(r.holes)r.holes.forEach(h=>{if(h.shots&&h.shots.length){const ms=_hasC6?h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined):h.shots;if(ms.length){sc+=ms.length;par+=h.par;played++;putts+=ms.filter(s=>s.club&&s.club.includes('パター')).length;}}});
     const vs=sc-par;const vsStr=sc&&played?(vs===0?'E':vs>0?'+'+vs:String(vs)):'';
     const col=vs<0?'var(--green)':vs>0?'var(--red)':'var(--text-2)';
     const avgP=played?Math.round(putts/played*10)/10:'-';
     // ホール別行
     const holeRows=(r.holes||[]).map((h,i)=>{
       if(!h.shots||!h.shots.length)return '';
-      const s=h.shots.length;const d=s-h.par;
+      const _hasC7=(r.companions&&r.companions.length>0);
+      const ms7=_hasC7?h.shots.filter(s=>s.shotOwner===null||s.shotOwner===undefined):h.shots;
+      if(!ms7.length)return '';
+      const s=ms7.length;const d=s-h.par;
       const scoreColor=d<0?'var(--green)':d>0?'var(--red)':'var(--text)';
       const LBL={'-3':'AL','-2':'EG','-1':'BD','0':'PAR','1':'BOG','2':'DBL','3':'TRI'};
       const lbl=LBL[d]||(d>0?'+'+d:d);
-      const hp=h.shots.filter(x=>x.club&&x.club.includes('パター')).length;
+      const hp=ms7.filter(x=>x.club&&x.club.includes('パター')).length;
       const shotsHtml=buildHoleShotsHtml(h,hNum(i));
       const uid=`vw-${ri}-hole-${i}`;
       return`<div>
