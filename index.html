@@ -580,9 +580,68 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
       <div class="card">
         <div class="fr" onclick="openDrum('パー',null,['Par 3','Par 4','Par 5'],'hs-par')"><span class="fr-lbl">パー</span><span class="fr-val set" id="hs-par-v">Par 4</span><span class="fr-arr">›</span></div>
         <div class="fr" onclick="openDist('ホールの距離（ヤード）','hs-hdist',false)"><span class="fr-lbl">距離</span><span class="fr-val" id="hs-hdist-v">-</span><span class="fr-arr">›</span></div>
-        <div class="fr" onclick="openDrum('コースレイアウト','ホールの形状・特徴',holeLayouts,'hs-layout')"><span class="fr-lbl">レイアウト</span><span class="fr-val" id="hs-layout-v">-</span><span class="fr-arr">›</span></div>
-        <div class="fr" onclick="openDrum('グリーンピン位置',null,pinPositions,'hs-pin')"><span class="fr-lbl">ピン位置</span><span class="fr-val" id="hs-pin-v">-</span><span class="fr-arr">›</span></div>
+        <div class="fr" onclick="openLayoutPicker()"><span class="fr-lbl">レイアウト</span><span class="fr-val" id="hs-layout-v">-</span><span class="fr-arr">›</span></div>
+        <div class="fr" onclick="openPinPicker()"><span class="fr-lbl">ピン位置</span><span class="fr-val" id="hs-pin-v">-</span><span class="fr-arr">›</span></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- LAYOUT PICKER (2ドラム式) -->
+<div class="drum-overlay" id="layout-picker-ov" style="display:none;z-index:3100">
+  <div class="drum-sheet" style="padding-bottom:max(env(safe-area-inset-bottom),16px)">
+    <div class="drum-hdr">
+      <button class="drum-cancel" onclick="closeLayoutPicker(false)">キャンセル</button>
+      <span class="drum-ttl">コースレイアウト</span>
+      <button class="drum-done" onclick="closeLayoutPicker(true)">完了</button>
+    </div>
+    <div style="display:flex;gap:0;padding:0 8px">
+      <div style="flex:1;position:relative;overflow:hidden">
+        <div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel" style="pointer-events:none"></div>
+        <div class="drum-col" id="layout-drum-shape" style="height:220px;overflow-y:scroll;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch"></div>
+      </div>
+      <div style="width:1px;background:var(--border);margin:12px 0;flex-shrink:0"></div>
+      <div style="flex:1;position:relative;overflow:hidden">
+        <div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel" style="pointer-events:none"></div>
+        <div class="drum-col" id="layout-drum-slope" style="height:220px;overflow-y:scroll;scroll-snap-type:y mandatory;-webkit-overflow-scrolling:touch"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PIN PICKER (SVGタッチ) -->
+<div class="drum-overlay" id="pin-picker-ov" style="display:none;z-index:3100">
+  <div class="drum-sheet" style="padding-bottom:max(env(safe-area-inset-bottom),16px)">
+    <div class="drum-hdr">
+      <button class="drum-cancel" onclick="closePinPicker(false)">キャンセル</button>
+      <span class="drum-ttl">ピン位置</span>
+      <button class="drum-done" onclick="closePinPicker(true)">完了</button>
+    </div>
+    <div style="padding:8px 24px 4px;text-align:center;font-size:12px;color:var(--text-2)">グリーンをタップしてピンを立ててください</div>
+    <div style="display:flex;justify-content:center;align-items:center;padding:8px 0 4px">
+      <svg id="pin-svg" viewBox="0 0 200 280" width="200" height="280" style="cursor:pointer;touch-action:none">
+        <!-- グリーン（楕円） -->
+        <ellipse cx="100" cy="140" rx="80" ry="110" fill="#4CAF50" opacity="0.18" stroke="#2e7d32" stroke-width="2"/>
+        <!-- 方向ラベル -->
+        <text x="100" y="22" text-anchor="middle" font-size="11" fill="#888">奥</text>
+        <text x="100" y="268" text-anchor="middle" font-size="11" fill="#888">手前</text>
+        <text x="10" y="144" text-anchor="middle" font-size="11" fill="#888">左</text>
+        <text x="190" y="144" text-anchor="middle" font-size="11" fill="#888">右</text>
+        <!-- センター補助線 -->
+        <line x1="100" y1="30" x2="100" y2="255" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3,3"/>
+        <line x1="20" y1="140" x2="180" y2="140" stroke="#ccc" stroke-width="0.5" stroke-dasharray="3,3"/>
+        <!-- ピンマーカー（JS制御） -->
+        <g id="pin-marker" style="display:none">
+          <circle id="pin-circle" cx="100" cy="140" r="8" fill="rgba(220,50,50,0.25)" stroke="#d32f2f" stroke-width="1.5"/>
+          <circle cx="100" cy="140" r="3" fill="#d32f2f" id="pin-dot"/>
+          <line x1="100" y1="132" x2="100" y2="108" stroke="#d32f2f" stroke-width="2" id="pin-flag-pole"/>
+          <polygon points="100,108 116,116 100,124" fill="#d32f2f" id="pin-flag"/>
+        </g>
+      </svg>
+    </div>
+    <div style="text-align:center;font-size:15px;font-weight:600;color:var(--text);min-height:24px;margin-bottom:4px" id="pin-label-preview">未設定</div>
+    <div style="text-align:center">
+      <button onclick="clearPinPos()" style="background:none;border:none;color:var(--text-3);font-size:12px;cursor:pointer;padding:4px 12px">リセット</button>
     </div>
   </div>
 </div>
@@ -1788,6 +1847,183 @@ function closeCupinModal(){document.getElementById('cupin-modal').classList.remo
 function setupAndGoHole(){
   goTo('s3'); // まずs3に遷移してrenderHoleを走らせる
   openHoleSetup(); // その上にモーダルを重ねる
+}
+
+// ===== LAYOUT PICKER (2ドラム) =====
+const LAYOUT_SHAPES=[
+  {val:'ストレート',label:'ストレート'},
+  {val:'右ドッグ（緩）',label:'右ドッグ（緩）'},
+  {val:'左ドッグ（緩）',label:'左ドッグ（緩）'},
+  {val:'右ドッグ',label:'右ドッグ'},
+  {val:'左ドッグ',label:'左ドッグ'},
+  {val:'ダブルドッグ',label:'ダブルドッグ'},
+];
+const LAYOUT_SLOPES=[
+  {val:'フラット',label:'平坦（フラット）'},
+  {val:'打ち上げ',label:'打ち上げ'},
+  {val:'打ち下ろし',label:'打ち下ろし'},
+];
+let _layoutShape='ストレート';
+let _layoutSlope='フラット';
+
+function openLayoutPicker(){
+  const cur=(DV['hs-layout']||'').replace(/^-$/,'');
+  // 現在値をパース
+  let shape='ストレート',slope='フラット';
+  if(cur){
+    const sl=LAYOUT_SLOPES.find(s=>cur.includes(s.val));
+    const sh=LAYOUT_SHAPES.find(s=>cur.includes(s.val));
+    if(sh)shape=sh.val;
+    if(sl)slope=sl.val;
+  }
+  _layoutShape=shape;_layoutSlope=slope;
+  // ドラムを組み立て
+  function buildDrum(id,items,selected){
+    const el=document.getElementById(id);
+    const ITEM_H=44;
+    el.innerHTML='<div style="height:88px;flex-shrink:0"></div>'
+      +items.map(it=>`<div style="height:${ITEM_H}px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:14px;font-weight:${it.val===selected?'700':'400'};color:${it.val===selected?'var(--text)':'var(--text-2)'};white-space:nowrap">${it.label}</div>`).join('')
+      +'<div style="height:88px;flex-shrink:0"></div>';
+    el.style.scrollBehavior='auto';
+    const idx=items.findIndex(i=>i.val===selected);
+    el.scrollTop=(idx<0?0:idx)*ITEM_H;
+    // scroll終了で選択値更新
+    el._items=items;
+    el._onKey=id==='layout-drum-shape'?'shape':'slope';
+    el.onscroll=()=>{
+      clearTimeout(el._st);
+      el._st=setTimeout(()=>{
+        const i=Math.round(el.scrollTop/ITEM_H);
+        const item=el._items[Math.min(i,el._items.length-1)];
+        if(!item)return;
+        if(el._onKey==='shape')_layoutShape=item.val;
+        else _layoutSlope=item.val;
+      },80);
+    };
+  }
+  buildDrum('layout-drum-shape',LAYOUT_SHAPES,shape);
+  buildDrum('layout-drum-slope',LAYOUT_SLOPES,slope);
+  const ov=document.getElementById('layout-picker-ov');
+  ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
+}
+
+function closeLayoutPicker(save){
+  const ov=document.getElementById('layout-picker-ov');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},250);
+  if(!save)return;
+  // 最終スクロール位置から値を確定
+  ['layout-drum-shape','layout-drum-slope'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    const ITEM_H=44;
+    const i=Math.round(el.scrollTop/ITEM_H);
+    const item=(el._items||[])[Math.min(i,(el._items||[]).length-1)];
+    if(!item)return;
+    if(el._onKey==='shape')_layoutShape=item.val;
+    else _layoutSlope=item.val;
+  });
+  const val=_layoutShape===_layoutSlope?_layoutShape:_layoutShape+' / '+_layoutSlope;
+  DV['hs-layout']=val;
+  sd('hs-layout-v',val);
+}
+
+// ===== PIN PICKER (SVGタッチ) =====
+let _pinX=null,_pinY=null;
+
+function openPinPicker(){
+  _pinX=null;_pinY=null;
+  // 現在値からピン位置を復元
+  const cur=(DV['hs-pin']||'').replace(/^-$/,'');
+  const svg=document.getElementById('pin-svg');
+  document.getElementById('pin-label-preview').textContent=cur||'未設定';
+  if(cur){
+    // テキストから座標を逆算（大まかに）
+    const pos=textToPinPos(cur);
+    if(pos){_pinX=pos.x;_pinY=pos.y;updatePinMarker();}
+    else{document.getElementById('pin-marker').style.display='none';}
+  }else{
+    document.getElementById('pin-marker').style.display='none';
+  }
+  // タッチ/クリック登録
+  svg.ontouchstart=svg.ontouchmove=null;
+  svg.ontouchstart=(e)=>{e.preventDefault();handlePinTouch(e.touches[0],svg);};
+  svg.ontouchmove=(e)=>{e.preventDefault();handlePinTouch(e.touches[0],svg);};
+  svg.onclick=(e)=>{handlePinTouch(e,svg);};
+  const ov=document.getElementById('pin-picker-ov');
+  ov.style.display='flex';
+  requestAnimationFrame(()=>ov.classList.add('open'));
+}
+
+function handlePinTouch(touch,svg){
+  const rect=svg.getBoundingClientRect();
+  const scaleX=200/rect.width;
+  const scaleY=280/rect.height;
+  const x=(touch.clientX-rect.left)*scaleX;
+  const y=(touch.clientY-rect.top)*scaleY;
+  _pinX=Math.max(20,Math.min(180,x));
+  _pinY=Math.max(30,Math.min(255,y));
+  updatePinMarker();
+  document.getElementById('pin-label-preview').textContent=pinPosToText(_pinX,_pinY);
+}
+
+function updatePinMarker(){
+  if(_pinX===null)return;
+  const m=document.getElementById('pin-marker');m.style.display='';
+  document.getElementById('pin-circle').setAttribute('cx',_pinX);
+  document.getElementById('pin-circle').setAttribute('cy',_pinY);
+  document.getElementById('pin-dot').setAttribute('cx',_pinX);
+  document.getElementById('pin-dot').setAttribute('cy',_pinY);
+  document.getElementById('pin-flag-pole').setAttribute('x1',_pinX);
+  document.getElementById('pin-flag-pole').setAttribute('y1',_pinY-8);
+  document.getElementById('pin-flag-pole').setAttribute('x2',_pinX);
+  document.getElementById('pin-flag-pole').setAttribute('y2',_pinY-30);
+  document.getElementById('pin-flag').setAttribute('points',`${_pinX},${_pinY-30} ${_pinX+16},${_pinY-22} ${_pinX},${_pinY-14}`);
+}
+
+function pinPosToText(x,y){
+  // y: 30=奥端, 255=手前端 → 3分割
+  const yRatio=(y-30)/(255-30); // 0=奥, 1=手前
+  const xRatio=(x-20)/(180-20); // 0=左, 1=右
+  let depth,side;
+  if(yRatio<0.33)depth='奥';
+  else if(yRatio<0.66)depth='センター';
+  else depth='手前';
+  if(xRatio<0.33)side='左';
+  else if(xRatio<0.67)side='センター';
+  else side='右';
+  if(depth==='センター'&&side==='センター')return 'センター';
+  if(depth==='センター')return 'センター'+side;
+  if(side==='センター')return depth;
+  return depth+side;
+}
+
+function textToPinPos(txt){
+  let x=100,y=140;
+  if(txt.includes('手前'))y=210;
+  else if(txt.includes('奥'))y=70;
+  else y=140;
+  if(txt.includes('右'))x=145;
+  else if(txt.includes('左'))x=55;
+  else x=100;
+  return{x,y};
+}
+
+function clearPinPos(){
+  _pinX=null;_pinY=null;
+  document.getElementById('pin-marker').style.display='none';
+  document.getElementById('pin-label-preview').textContent='未設定';
+}
+
+function closePinPicker(save){
+  const ov=document.getElementById('pin-picker-ov');
+  ov.classList.remove('open');
+  setTimeout(()=>{ov.style.display='none';},250);
+  if(!save)return;
+  const lbl=_pinX!==null?pinPosToText(_pinX,_pinY):'-';
+  DV['hs-pin']=lbl;
+  sd('hs-pin-v',lbl);
 }
 
 function openHoleSetup(){
