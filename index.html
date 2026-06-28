@@ -1296,7 +1296,7 @@ function sv(key,val){
 }
 function gv(key){return DV[key]||'';}
 function getIdx(sc,len){return Math.max(0,Math.min(Math.round(sc.scrollTop/IH),len-1));}
-function fillScroll(sc,items,initIdx){sc.innerHTML='';items.forEach(txt=>{const d=document.createElement('div');d.className='d-item';d.textContent=txt;sc.appendChild(d);});sc.scrollTop=Math.max(0,initIdx)*IH;}
+function fillScroll(sc,items,initIdx){sc.innerHTML='';items.forEach(txt=>{const d=document.createElement('div');d.className='d-item';d.textContent=txt;sc.appendChild(d);});const _t=Math.max(0,initIdx)*IH;sc.scrollTop=_t;setTimeout(()=>{sc.scrollTop=_t;},0);}
 
 function isPutt(){return (SF.club||'').includes('パター');}
 function updatePuttSection(){
@@ -1873,66 +1873,65 @@ const LAYOUT_SLOPES=[
 let _layoutShape='ストレート';
 let _layoutSlope='フラット';
 
-function openLayoutPicker(){
-  // 毎回ストレート/フラットから始める
-  _layoutShape='ストレート';
-  _layoutSlope='フラット';
+// layout選択中の値（onscrollでリアルタイム更新）
+let _lShape='ストレート';
+let _lSlope='フラット';
 
-  function buildDrum(id,items,selected){
-    const ITEM_H=44;
+function openLayoutPicker(){
+  const ITEM_H=44;
+  const PAD=88;
+  // 毎回初期値にリセット
+  _lShape='ストレート';
+  _lSlope='フラット';
+
+  function buildDrum(id,items,key){
     const el=document.getElementById(id);
-    el.onscroll=null; // 前回イベント解除
-    el.innerHTML='<div style="height:88px;flex-shrink:0"></div>'
-      +items.map(it=>`<div style="height:${ITEM_H}px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:14px;white-space:nowrap;padding:0 8px">${it.label}</div>`).join('')
-      +'<div style="height:88px;flex-shrink:0"></div>';
-    el._items=items;
-    el._ITEM_H=ITEM_H;
-    el._onKey=id==='layout-drum-shape'?'shape':'slope';
-    const idx=Math.max(0,items.findIndex(i=>i.val===selected));
-    // DOMが確定してからscrollTop設定
-    requestAnimationFrame(()=>{
+    el.onscroll=null;
+    el.innerHTML='<div style="height:'+PAD+'px;flex-shrink:0"></div>'
+      +items.map(it=>'<div style="height:'+ITEM_H+'px;display:flex;align-items:center;justify-content:center;scroll-snap-align:center;font-size:14px;white-space:nowrap;padding:0 8px">'+it.label+'</div>').join('')
+      +'<div style="height:'+PAD+'px;flex-shrink:0"></div>';
+    // scrollTop設定はDOM確定後
+    setTimeout(()=>{
       el.style.scrollBehavior='auto';
-      el.scrollTop=idx*ITEM_H;
-      requestAnimationFrame(()=>{
-        el.style.scrollBehavior='';
-        el.onscroll=()=>{
-          const i=Math.min(Math.round(el.scrollTop/el._ITEM_H),el._items.length-1);
-          const item=el._items[Math.max(0,i)];
-          if(!item)return;
-          if(el._onKey==='shape')_layoutShape=item.val;
-          else _layoutSlope=item.val;
-        };
-      });
-    });
+      el.scrollTop=0;
+      // onscrollでリアルタイムに変数へ反映
+      el.onscroll=function(){
+        const i=Math.min(Math.max(0,Math.round(el.scrollTop/ITEM_H)),items.length-1);
+        if(key==='shape')_lShape=items[i].val;
+        else _lSlope=items[i].val;
+      };
+    },0);
   }
 
-  buildDrum('layout-drum-shape',LAYOUT_SHAPES,'ストレート');
-  buildDrum('layout-drum-slope',LAYOUT_SLOPES,'フラット');
+  buildDrum('layout-drum-shape',LAYOUT_SHAPES,'shape');
+  buildDrum('layout-drum-slope',LAYOUT_SLOPES,'slope');
   const ov=document.getElementById('layout-picker-ov');
   requestAnimationFrame(()=>ov.classList.add('open'));
 }
 
 function closeLayoutPicker(save){
+  if(save){
+    // モーダルを閉じる前に現在のscrollTopから最終値を確定
+    const ITEM_H=44;
+    const shapeEl=document.getElementById('layout-drum-shape');
+    const slopeEl=document.getElementById('layout-drum-slope');
+    if(shapeEl){
+      const i=Math.min(Math.max(0,Math.round(shapeEl.scrollTop/ITEM_H)),LAYOUT_SHAPES.length-1);
+      _lShape=LAYOUT_SHAPES[i].val;
+    }
+    if(slopeEl){
+      const i=Math.min(Math.max(0,Math.round(slopeEl.scrollTop/ITEM_H)),LAYOUT_SLOPES.length-1);
+      _lSlope=LAYOUT_SLOPES[i].val;
+    }
+    let val=_lShape;
+    if(_lSlope&&_lSlope!=='フラット')val+=' '+_lSlope;
+    DV['hs-layout']=val;
+    const el1=document.getElementById('hs-layout-v');
+    if(el1){el1.textContent=val;el1.className='fr-val set';}
+  }
+  // 値を読んだ後に閉じる
   const ov=document.getElementById('layout-picker-ov');
   ov.classList.remove('open');
-  if(!save)return;
-  // 完了時：最終スクロール位置から値を確定
-  const ITEM_H=44;
-  ['layout-drum-shape','layout-drum-slope'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(!el||!el._items)return;
-    const i=Math.min(Math.round(el.scrollTop/ITEM_H),el._items.length-1);
-    const item=el._items[Math.max(0,i)];
-    if(!item)return;
-    if(el._onKey==='shape')_layoutShape=item.val;
-    else _layoutSlope=item.val;
-  });
-  // 表示テキスト：フラットは省略、ストレートのみの場合はそのまま
-  let val=_layoutShape;
-  if(_layoutSlope&&_layoutSlope!=='フラット')val+=_layoutSlope==='打ち上げ'?' 打上げ':' 打下ろし';
-  DV['hs-layout']=val;
-  const el1=document.getElementById('hs-layout-v');
-  if(el1){el1.textContent=val;el1.className='fr-val set';}
 }
 
 // ===== PIN PICKER (SVGタッチ) =====
