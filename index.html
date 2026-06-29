@@ -3396,8 +3396,26 @@ function renderProfilePage(){
       ${clubRows}
     </div>
     <button onclick="addClubRow()" class="btn btn-secondary" style="margin-top:8px;font-size:14px;padding:12px">＋ クラブを追加</button>
+    <div style="margin-top:32px;border-top:0.5px solid var(--border);padding-top:20px">
+      <div id="auth-status-lbl" style="font-size:12px;color:var(--text-2);text-align:center;margin-bottom:12px"></div>
+      <button onclick="signOutUser()" id="logout-btn" style="display:none;width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--red);background:transparent;color:var(--red);font-size:14px;font-weight:600;cursor:pointer">🚪 ログアウト</button>
+    </div>
     <div style="height:calc(var(--safe-bot,0px)+24px)"></div>
   `;
+  // ログイン状態を表示
+  setTimeout(()=>{
+    const lbl=document.getElementById('auth-status-lbl');
+    const btn=document.getElementById('logout-btn');
+    if(!lbl||!btn)return;
+    if(typeof currentUser2!=='undefined'&&currentUser2){
+      lbl.textContent='ログイン中：'+currentUser2.email;
+      btn.style.display='block';
+    }else if(typeof skipLoginMode2!=='undefined'&&skipLoginMode2){
+      lbl.textContent='ローカルモード（同期なし）';
+    }else{
+      lbl.textContent='未ログイン';
+    }
+  },50);
   // chip選択状態を内部変数に保持
   window._profileTemp={
     hand:p.hand||'right',
@@ -4751,6 +4769,20 @@ function submitAuth() {
     };
     if (errEl) { errEl.style.display = ''; errEl.textContent = msgs[err.code] || ('エラー: ' + err.code); }
     if (btn) { btn.textContent = authMode2 === 'signup' ? '新規登録' : 'ログイン'; btn.disabled = false; }
+  });
+}
+
+function signOutUser() {
+  if (!auth2) return;
+  if (!confirm('ログアウトしますか？\nローカルのデータは保持されます。')) return;
+  auth2.signOut().then(() => {
+    currentUser2 = null;
+    skipLoginMode2 = false;
+    try { localStorage.removeItem('golf_auth_email'); } catch(e) {}
+    try { localStorage.removeItem('golf_auth_password'); } catch(e) {}
+    showLoginScreen();
+  }).catch(err => {
+    alert('ログアウトに失敗しました：' + err.message);
   });
 }
 
