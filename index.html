@@ -1050,7 +1050,7 @@ let distKey='',distIsPutt=false;
 // ===== STORAGE =====
 const STORE_KEY='golf_rounds_v1';
 function loadRounds(){try{return JSON.parse(localStorage.getItem(STORE_KEY)||'[]');}catch(e){return [];}}
-function saveAllRounds(rounds){try{localStorage.setItem(STORE_KEY,JSON.stringify(rounds));}catch(e){}if(typeof saveToFirestore==="function")saveToFirestore();}
+function saveAllRounds(rounds){try{localStorage.setItem(STORE_KEY,JSON.stringify(rounds));}catch(e){}scheduleFirestoreSync();}
 function saveCurrentRound(){
   const rounds=loadRounds();
   const idx=rounds.findIndex(r=>r.id===R.id);
@@ -3283,7 +3283,7 @@ function loadProfile(){
 }
 function saveProfileData(p){
   localStorage.setItem(PROFILE_KEY,JSON.stringify(p));
-  if(typeof saveToFirestore==="function")saveToFirestore();
+  scheduleFirestoreSync();
 }
 
 // クラブリストをプロフィール設定から生成（未設定ならデフォルト）
@@ -3701,7 +3701,7 @@ function loadPlayers(){
 }
 function savePlayers(players){
   localStorage.setItem(PLAYERS_KEY,JSON.stringify(players));
-  if(typeof saveToFirestore==="function")saveToFirestore();
+  scheduleFirestoreSync();
 }
 // 同伴者（自分とは別リスト）
 function loadCompanions(){
@@ -3709,7 +3709,7 @@ function loadCompanions(){
 }
 function saveCompanions(companions){
   localStorage.setItem(COMPANIONS_KEY,JSON.stringify(companions));
-  if(typeof saveToFirestore==="function")saveToFirestore();
+  scheduleFirestoreSync();
 }
 function getActivePlayerId(){
   return localStorage.getItem(ACTIVE_PLAYER_KEY)||null;
@@ -4802,8 +4802,23 @@ function restoreSavedAuth() {
 }
 
 /* ── Firestore 同期 ── */
+let _syncTimer = null;
+
+// debounce: 連続保存をまとめて1回のFirestore書き込みに
+function scheduleFirestoreSync() {
+  if (typeof saveToFirestore !== 'function') return;
+  clearTimeout(_syncTimer);
+  _syncTimer = setTimeout(() => saveToFirestore(), 800);
+}
+
 async function saveToFirestore() {
-  if (!currentUser2 || isSyncing2 || skipLoginMode2) return;
+  if (!currentUser2 || skipLoginMode2) return;
+  if (isSyncing2) {
+    // 実行中なら少し待って再試行
+    clearTimeout(_syncTimer);
+    _syncTimer = setTimeout(() => saveToFirestore(), 1200);
+    return;
+  }
   isSyncing2 = true;
   try {
     const uid = currentUser2.uid;
@@ -4815,7 +4830,8 @@ async function saveToFirestore() {
       activePlayerId: getActivePlayerId(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     };
-    await db_fs2.collection('golf_users').doc(uid).set(data, { merge: true });
+    await db_fs2.collection('golf_users').doc(uid).set(data);
+    console.log('Firestore saved OK');
   } catch(e) {
     console.error('Firestore save error:', e);
   } finally {
@@ -4830,12 +4846,17 @@ async function loadFromFirestore() {
     const doc = await db_fs2.collection('golf_users').doc(uid).get();
     if (doc.exists) {
       const d = doc.data();
-      // ローカルより新しければFirestoreを優先
-      if (d.rounds)     { try { localStorage.setItem(STORE_KEY, JSON.stringify(d.rounds)); } catch(e) {} }
-      if (d.profile)    { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(d.profile)); } catch(e) {} }
-      if (d.players)    { try { localStorage.setItem(PLAYERS_KEY, JSON.stringify(d.players)); } catch(e) {} }
-      if (d.companions) { try { localStorage.setItem(COMPANIONS_KEY, JSON.stringify(d.companions)); } catch(e) {} }
+      // Firestoreのデータで必ずlocalStorageを上書き（デバイス間同期の核心）
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(d.rounds || [])); } catch(e) {}
+      try { localStorage.setItem(PROFILE_KEY, JSON.stringify(d.profile || null)); } catch(e) {}
+      try { localStorage.setItem(PLAYERS_KEY, JSON.stringify(d.players || [])); } catch(e) {}
+      try { localStorage.setItem(COMPANIONS_KEY, JSON.stringify(d.companions || [])); } catch(e) {}
       if (d.activePlayerId) { try { setActivePlayerId(d.activePlayerId); } catch(e) {} }
+      console.log('Firestore loaded OK, rounds:', (d.rounds||[]).length);
+    } else {
+      // Firestoreにデータなし → このデバイスのデータをFirestoreに初回保存
+      console.log('Firestore: no data found, saving local data');
+      await saveToFirestore();
     }
     renderHome();
   } catch(e) {
