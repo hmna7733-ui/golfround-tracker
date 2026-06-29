@@ -646,6 +646,54 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
   </div>
 </div>
 
+<!-- ════════ ログイン画面 ════════ -->
+<div id="login-screen" style="
+  position:fixed;inset:0;
+  background:linear-gradient(135deg,#0a1f14,#0F6E56);
+  z-index:9999;
+  display:none;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:32px;
+">
+  <div style="font-size:14px;letter-spacing:3px;color:rgba(255,255,255,.5);margin-bottom:8px;font-weight:500">GOLF ROUND TRACKER</div>
+  <div style="font-size:38px;font-weight:800;color:#fff;letter-spacing:-1px;margin-bottom:4px">⛳ ラウンド記録</div>
+  <div style="font-size:12px;color:rgba(255,255,255,.45);margin-bottom:40px">一打一打を、データに。</div>
+
+  <!-- タブ -->
+  <div style="display:flex;background:rgba(255,255,255,.1);border-radius:12px;padding:4px;width:100%;max-width:320px;margin-bottom:20px">
+    <button id="tab-login" onclick="showAuthTab('login')" style="flex:1;padding:8px;border:none;border-radius:8px;background:#fff;color:#0a3d26;font-size:13px;font-weight:700;cursor:pointer">ログイン</button>
+    <button id="tab-signup" onclick="showAuthTab('signup')" style="flex:1;padding:8px;border:none;border-radius:8px;background:transparent;color:rgba(255,255,255,.7);font-size:13px;font-weight:600;cursor:pointer;transition:all .2s">新規登録</button>
+  </div>
+
+  <div style="width:100%;max-width:320px">
+    <input id="auth-email" type="email" placeholder="メールアドレス" autocomplete="email" style="
+      width:100%;padding:13px 16px;border-radius:12px;border:none;
+      font-size:15px;margin-bottom:10px;box-sizing:border-box;
+      background:rgba(255,255,255,.95);color:#1a1a2e;
+    ">
+    <input id="auth-password" type="password" placeholder="パスワード（6文字以上）" autocomplete="current-password" style="
+      width:100%;padding:13px 16px;border-radius:12px;border:none;
+      font-size:15px;margin-bottom:16px;box-sizing:border-box;
+      background:rgba(255,255,255,.95);color:#1a1a2e;
+    ">
+    <button id="auth-submit-btn" onclick="submitAuth()" style="
+      width:100%;padding:14px;border-radius:12px;border:none;
+      background:linear-gradient(135deg,#0F6E56,#1aa37a);
+      color:#fff;font-size:15px;font-weight:700;cursor:pointer;
+      margin-bottom:10px;box-shadow:0 4px 16px rgba(15,110,86,.4);
+    ">ログイン</button>
+    <button onclick="skipLogin()" style="
+      width:100%;padding:11px;border-radius:12px;
+      background:rgba(255,255,255,.08);color:rgba(255,255,255,.55);
+      border:1px solid rgba(255,255,255,.15);font-size:13px;cursor:pointer;
+    ">このデバイスのみで使う（同期なし）</button>
+  </div>
+  <div id="login-error" style="color:#F7A8A8;font-size:13px;margin-top:12px;text-align:center;display:none;max-width:320px"></div>
+  <div style="color:rgba(255,255,255,.3);font-size:11px;margin-top:20px;text-align:center;line-height:1.6">
+    メール＋パスワードで複数デバイス間でデータ同期
+  </div>
+</div>
+
 <!-- DRUM -->
 <div class="drum-overlay" id="drum-ov">
   <div class="drum-sheet">
@@ -921,6 +969,11 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
 </div>
 
 </div>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
 <script>
 const IH=44;
 const greenTypes=[
@@ -4582,5 +4635,207 @@ if(document.readyState==='complete'||document.readyState==='interactive'){
   setTimeout(checkSharedUrl, 200);
 }
 </script>
+
+<script>
+/* ══════════════════════════════════════════
+   Firebase 設定・認証・Firestore同期
+══════════════════════════════════════════ */
+const firebaseConfig = {
+  apiKey: "AIzaSyAv35i4MSksru9csqLBbtZvHEJbWfaVQGs",
+  authDomain: "boat-d715f.firebaseapp.com",
+  projectId: "boat-d715f",
+  storageBucket: "boat-d715f.firebasestorage.app",
+  messagingSenderId: "143618120714",
+  appId: "1:143618120714:web:8fe8f3548ada361d5053f3"
+};
+
+let firebaseApp2, auth2, db_fs2, currentUser2 = null;
+let skipLoginMode2 = false;
+let isSyncing2 = false;
+
+function initFirebase() {
+  try {
+    firebaseApp2 = firebase.initializeApp(firebaseConfig, 'golf');
+    auth2 = firebase.auth(firebaseApp2);
+    db_fs2 = firebase.firestore(firebaseApp2);
+
+    auth2.onAuthStateChanged(user => {
+      if (skipLoginMode2) return;
+      if (user) {
+        currentUser2 = user;
+        hideLoginScreen();
+        loadFromFirestore();
+      } else {
+        currentUser2 = null;
+        showLoginScreen();
+      }
+    });
+  } catch(e) {
+    console.error('Firebase init error:', e);
+    hideLoginScreen();
+  }
+}
+
+function showLoginScreen() {
+  const ls = document.getElementById('login-screen');
+  if (ls) ls.style.display = 'flex';
+  restoreSavedAuth();
+}
+
+function hideLoginScreen() {
+  const ls = document.getElementById('login-screen');
+  if (ls) ls.style.display = 'none';
+}
+
+function skipLogin() {
+  skipLoginMode2 = true;
+  hideLoginScreen();
+}
+
+let authMode2 = 'login';
+
+function showAuthTab(mode) {
+  authMode2 = mode;
+  const lt = document.getElementById('tab-login');
+  const st = document.getElementById('tab-signup');
+  const btn = document.getElementById('auth-submit-btn');
+  const base = 'flex:1;padding:8px;border:none;border-radius:8px;font-size:13px;cursor:pointer;';
+  if (mode === 'login') {
+    lt.style.cssText = base + 'background:#fff;color:#0a3d26;font-weight:700;';
+    st.style.cssText = base + 'background:transparent;color:rgba(255,255,255,.7);font-weight:600;';
+    if (btn) btn.textContent = 'ログイン';
+  } else {
+    st.style.cssText = base + 'background:#fff;color:#0a3d26;font-weight:700;';
+    lt.style.cssText = base + 'background:transparent;color:rgba(255,255,255,.7);font-weight:600;';
+    if (btn) btn.textContent = '新規登録';
+  }
+  const errEl = document.getElementById('login-error');
+  if (errEl) errEl.style.display = 'none';
+}
+
+function submitAuth() {
+  const email = (document.getElementById('auth-email') || {}).value?.trim();
+  const password = (document.getElementById('auth-password') || {}).value;
+  const errEl = document.getElementById('login-error');
+  const btn = document.getElementById('auth-submit-btn');
+
+  if (!email || !password) {
+    if (errEl) { errEl.style.display = ''; errEl.textContent = 'メールアドレスとパスワードを入力してください'; }
+    return;
+  }
+  if (password.length < 6) {
+    if (errEl) { errEl.style.display = ''; errEl.textContent = 'パスワードは6文字以上にしてください'; }
+    return;
+  }
+
+  if (btn) { btn.textContent = '処理中...'; btn.disabled = true; }
+  if (errEl) errEl.style.display = 'none';
+
+  try { localStorage.setItem('golf_auth_email', email); } catch(e) {}
+
+  const action = authMode2 === 'signup'
+    ? auth2.createUserWithEmailAndPassword(email, password)
+    : auth2.signInWithEmailAndPassword(email, password);
+
+  action.then(() => {
+    try { localStorage.setItem('golf_auth_password', password); } catch(e) {}
+  }).catch(err => {
+    console.error('Auth error:', err.code);
+    const msgs = {
+      'auth/user-not-found': 'このメールアドレスは登録されていません',
+      'auth/wrong-password': 'パスワードが間違っています',
+      'auth/email-already-in-use': 'このメールアドレスは既に登録済みです',
+      'auth/invalid-email': 'メールアドレスの形式が正しくありません',
+      'auth/weak-password': 'パスワードが弱すぎます（6文字以上）',
+      'auth/invalid-credential': 'メールアドレスまたはパスワードが間違っています',
+    };
+    if (errEl) { errEl.style.display = ''; errEl.textContent = msgs[err.code] || ('エラー: ' + err.code); }
+    if (btn) { btn.textContent = authMode2 === 'signup' ? '新規登録' : 'ログイン'; btn.disabled = false; }
+  });
+}
+
+function restoreSavedAuth() {
+  try {
+    const email = localStorage.getItem('golf_auth_email');
+    const password = localStorage.getItem('golf_auth_password');
+    if (email) { const e = document.getElementById('auth-email'); if (e) e.value = email; }
+    if (password) { const p = document.getElementById('auth-password'); if (p) p.value = password; }
+    if (email && password && auth2) {
+      auth2.signInWithEmailAndPassword(email, password).catch(() => {});
+    }
+  } catch(e) {}
+}
+
+/* ── Firestore 同期 ── */
+async function saveToFirestore() {
+  if (!currentUser2 || isSyncing2 || skipLoginMode2) return;
+  isSyncing2 = true;
+  try {
+    const uid = currentUser2.uid;
+    const data = {
+      rounds: loadRounds(),
+      profile: loadProfile(),
+      players: loadPlayers(),
+      companions: loadCompanions(),
+      activePlayerId: getActivePlayerId(),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+    await db_fs2.collection('golf_users').doc(uid).set(data, { merge: true });
+  } catch(e) {
+    console.error('Firestore save error:', e);
+  } finally {
+    isSyncing2 = false;
+  }
+}
+
+async function loadFromFirestore() {
+  if (!currentUser2) return;
+  try {
+    const uid = currentUser2.uid;
+    const doc = await db_fs2.collection('golf_users').doc(uid).get();
+    if (doc.exists) {
+      const d = doc.data();
+      // ローカルより新しければFirestoreを優先
+      if (d.rounds)     { try { localStorage.setItem(STORE_KEY, JSON.stringify(d.rounds)); } catch(e) {} }
+      if (d.profile)    { try { localStorage.setItem(PROFILE_KEY, JSON.stringify(d.profile)); } catch(e) {} }
+      if (d.players)    { try { localStorage.setItem(PLAYERS_KEY, JSON.stringify(d.players)); } catch(e) {} }
+      if (d.companions) { try { localStorage.setItem(COMPANIONS_KEY, JSON.stringify(d.companions)); } catch(e) {} }
+      if (d.activePlayerId) { try { setActivePlayerId(d.activePlayerId); } catch(e) {} }
+    }
+    renderHome();
+  } catch(e) {
+    console.error('Firestore load error:', e);
+    renderHome();
+  }
+}
+
+// データ保存時にFirestoreへも同期するラッパー
+const _origSaveAllRounds = saveAllRounds;
+function saveAllRounds(rounds) {
+  _origSaveAllRounds(rounds);
+  saveToFirestore();
+}
+const _origSaveProfileData = saveProfileData;
+function saveProfileData(p) {
+  _origSaveProfileData(p);
+  saveToFirestore();
+}
+const _origSavePlayers = savePlayers;
+function savePlayers(players) {
+  _origSavePlayers(players);
+  saveToFirestore();
+}
+const _origSaveCompanions = saveCompanions;
+function saveCompanions(companions) {
+  _origSaveCompanions(companions);
+  saveToFirestore();
+}
+
+// 起動時にFirebase初期化
+window.addEventListener('DOMContentLoaded', () => {
+  initFirebase();
+});
+</script>
+
 </body>
 </html>
