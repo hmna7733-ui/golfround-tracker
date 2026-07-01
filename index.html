@@ -1591,7 +1591,7 @@ function recalcHitDist(h){
       const ownerKey=ownerId===activeId?null:ownerId;
       const ownerShots=h.shots.filter(s=>(s.shotOwner||null)===ownerKey&&!s.isPenalty);
       ownerShots.forEach((s,i)=>{
-        if(i<ownerShots.length-1){const nd=ownerShots[i+1].dist;s.hitdist=(s.dist&&nd&&s.dist_unit!=='歩数')?Math.max(0,s.dist-nd):null;}
+        if(i<ownerShots.length-1){const nd=ownerShots[i+1].dist;s.hitdist=(s.dist&&nd&&s.dist_unit!=='歩数')?Math.round(Math.max(0,s.dist-nd)*10)/10:null;}
         else s.hitdist=null;
       });
     });
@@ -1599,7 +1599,7 @@ function recalcHitDist(h){
     h.shots.filter(s=>s.isPenalty).forEach(s=>{s.hitdist=null;});
   }else{
     h.shots.forEach((s,i)=>{
-      if(i<h.shots.length-1){const nd=h.shots[i+1].dist;s.hitdist=(s.dist&&nd&&s.dist_unit!=='歩数')?Math.max(0,s.dist-nd):null;}
+      if(i<h.shots.length-1){const nd=h.shots[i+1].dist;s.hitdist=(s.dist&&nd&&s.dist_unit!=='歩数')?Math.round(Math.max(0,s.dist-nd)*10)/10:null;}
       else s.hitdist=null;
     });
   }
@@ -1623,7 +1623,7 @@ function renderShots(){
     const isP=s.club&&s.club.includes('パター');
     const clubShort=(s.club||'-').replace(/（.*?）/,'').replace(/\(.*?\)/,'');
     const du=s.dist_unit||'y';
-    const dp=s.hitdist?`${s.hitdist}y打→`:s.dist?`残${s.dist}${du}`:'';
+    const dp=s.hitdist?`${Math.round(s.hitdist*10)/10}y打→`:s.dist?`残${s.dist}${du}`:'';
     const cupMark=s.cupIn?'<span style="color:var(--blue)"> ⛳</span>':'';
     const penBadge=s.penalty?`<span style="font-size:11px;color:var(--red);background:var(--red-lt);padding:1px 6px;border-radius:6px;margin-left:4px">${s.penaltyLabel}</span>`:'';
     div.innerHTML=`<div class="shot-num${isP?' is-putt':''}">${i+1}</div>
@@ -1747,7 +1747,7 @@ function openShotForm(idx){
     if(s.impact){sd('sf-impact-v',s.impact);DV['sf-impact']=s.impact;
       const pi=document.getElementById('sf-impact-putt-v');if(pi){pi.textContent=s.impact;pi.className='fr-val set';}}
     document.getElementById('sf-note').value=s.note||'';
-    if(s.hitdist)document.getElementById('sf-hitdist-v').textContent=s.hitdist+'y（計算済み）';
+    if(s.hitdist)document.getElementById('sf-hitdist-v').textContent=(Math.round(s.hitdist*10)/10)+'y（計算済み）';
   }
 
   // shotOwnerをSFに設定
@@ -2359,18 +2359,20 @@ function rebuildPuttData(){
       const dispNum=isIN?(hi<9?hi+10:hi-8):hi+1;
       const ps=(h.shots||[]).filter(s=>s.club&&s.club.includes('パター'));
       if(!ps.length)return;
-      const fp=ps[0];
-      // dist が null/undefined/負の値のみスキップ（0は有効）
-      if(fp.dist===null||fp.dist===undefined)return;
-      const dm=ptM(fp.dist, fp.dist_unit||'y');
-      if(dm===null||dm<0)return;
-      const made=fp.cupIn===true;
-      fps.push({
-        distM:dm, made, ps, h, fp,
-        distOrig:fp.dist+(fp.dist_unit||'y'),
-        dispNum, roundDate:r.date||'', roundCourse:r.course||'',
-        par:h.par, holeObj:h, shotObj:fp,
-        roundId:r.id, holeIdx:hi
+      // 全パット（第1打〜最終打）をfpsに追加
+      ps.forEach((fp,pi)=>{
+        if(fp.dist===null||fp.dist===undefined)return;
+        const dm=ptM(fp.dist, fp.dist_unit||'y');
+        if(dm===null||dm<0)return;
+        const made=fp.cupIn===true;
+        fps.push({
+          distM:dm, made, ps, h, fp,
+          distOrig:fp.dist+(fp.dist_unit||'y'),
+          dispNum, roundDate:r.date||'', roundCourse:r.course||'',
+          par:h.par, holeObj:h, shotObj:fp,
+          roundId:r.id, holeIdx:hi,
+          puttIdx:pi  // 何打目のパットか（0=第1パット）
+        });
       });
     });
   });
@@ -2400,7 +2402,7 @@ function openShotDetailOverlay(overlayId, title, shotRefs, summaryHtml){
     const s=ref.s;
     const du=s.dist_unit||'y';
     const distStr=s.dist?`残${s.dist}${du}`:'';
-    const hitStr=s.hitdist?`${s.hitdist}y 飛`:'';
+    const hitStr=s.hitdist?`${Math.round(s.hitdist*10)/10}y 飛`:'';
     const accTxt=s.acc?s.acc.split('（')[0]:'';
     const dirTxt=s.dir&&s.dir!=='センター（目標通り）'?s.dir:'';
     const impTxt=s.impact?s.impact.split('（')[0]:'';
@@ -2422,9 +2424,11 @@ function openShotDetailOverlay(overlayId, title, shotRefs, summaryHtml){
   const ov=document.createElement('div');
   ov.id=overlayId;
   ov.style.cssText='position:fixed;inset:0;background:var(--card);z-index:500;overflow-y:auto;padding:0 0 40px';
+  // safe-area をJSで取得してpadding-topに直接設定
+  const _safeTopPx=(()=>{try{const v=getComputedStyle(document.documentElement).getPropertyValue('--safe-top').trim();return parseFloat(v)||0;}catch(e){return 0;}})();
   ov.innerHTML=`
-    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:calc(var(--safe-top) + 10px) 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
-      <button onclick="document.getElementById('${overlayId}')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:8px 10px;min-height:44px">← 戻る</button>
+    <div id="${overlayId}-hdr" style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:${_safeTopPx+10}px 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
+      <button onclick="document.getElementById('${overlayId}')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:8px 12px;min-height:44px;min-width:60px">← 戻る</button>
       <div style="flex:1;font-size:15px;font-weight:700;text-align:center">${title}</div>
       <div style="min-width:44px;text-align:right;font-size:12px;color:var(--text-2)">${shotRefs.length}件</div>
     </div>
@@ -2549,9 +2553,10 @@ function openPuttBandDetail(bandIdx){
   const overlay=document.createElement('div');
   overlay.id='putt-band-overlay';
   overlay.style.cssText='position:fixed;inset:0;background:var(--card);z-index:500;overflow-y:auto;padding:0 0 40px';
+  const _puttSafeTop=(()=>{try{const v=getComputedStyle(document.documentElement).getPropertyValue('--safe-top').trim();return parseFloat(v)||0;}catch(e){return 0;}})();
   overlay.innerHTML=`
-    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:calc(var(--safe-top) + 10px) 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
-      <button onclick="document.getElementById('putt-band-overlay')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:8px 10px;min-height:44px">← 戻る</button>
+    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:${_puttSafeTop+10}px 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
+      <button onclick="document.getElementById('putt-band-overlay')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:8px 12px;min-height:44px;min-width:60px">← 戻る</button>
       <div style="flex:1;font-size:16px;font-weight:700;text-align:center">${title}</div>
       <div style="min-width:44px;text-align:right;font-size:13px;font-weight:700;color:${rate>=70?'var(--green)':'var(--amber)'}">${rate}%</div>
     </div>
@@ -2891,19 +2896,18 @@ function renderAnalysis(){
     return Math.round(m*10)/10; // 小数第1位に丸め
   }
 
-  // パットの第1打（その穴の最初のパット）を収集
+  // 全パット（第1打〜最終打）を収集
   const firstPutts=[];
   allHoles.forEach(h=>{
     const ps=h.shots.filter(s=>s.club&&s.club.includes('パター'));
     if(!ps.length)return;
-    const fp=ps[0];
-    if(!fp.dist)return;
-    const dm=puttDistToM(fp.dist,fp.dist_unit||'y');
-    if(dm===null)return;
-    const holed=fp.cupIn||(ps.length===1&&fp.cupIn!==false&&ps.length===1); // カップインか
-    // cupInフラグで判定
-    const made=fp.cupIn===true;
-    firstPutts.push({distM:dm,made,shot:fp});
+    ps.forEach((fp,pi)=>{
+      if(fp.dist===null||fp.dist===undefined)return;
+      const dm=puttDistToM(fp.dist,fp.dist_unit||'y');
+      if(dm===null||dm<0)return;
+      const made=fp.cupIn===true;
+      firstPutts.push({distM:dm,made,shot:fp,puttIdx:pi});
+    });
   });
 
   // 2m以内のイン率（0〜2m未満の帯：〜1m + 1〜2m）
@@ -4645,7 +4649,7 @@ function renderShotsByOwner(){
         const isP=s.club&&s.club.includes('パター');
         const clubShort=(s.club||'-').replace(/（.*?）/,'');
         const du=s.dist_unit||'y';
-        const dp=s.hitdist?`${s.hitdist}y打→`:s.dist?`残${s.dist}${du}`:'';
+        const dp=s.hitdist?`${Math.round(s.hitdist*10)/10}y打→`:s.dist?`残${s.dist}${du}`:'';
         const cupMark=s.cupIn?'<span style="color:var(--blue)"> ⛳</span>':'';
         const globalIdx=h.shots.indexOf(s);
         div.innerHTML=`<div class="shot-num${isP?' is-putt':''}">${shotNo}</div>
