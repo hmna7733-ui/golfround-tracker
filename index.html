@@ -2468,32 +2468,62 @@ function buildShotRefs(filterFn){
   return refs;
 }
 
-function openClubDistDetail(idx){
+function openClubDistDetail(ci, si){
   const list=window._clubDistList||[];
-  const c=list[idx];
+  const c=list[ci];
   if(!c)return;
-  // ラウンドから同クラブのhitdistデータをIDベースで再取得
-  const refs=buildShotRefs((s)=>
-    s.club&&s.club.replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').trim()===c.name&&
+  const sw=c.swings[si];
+  if(!sw)return;
+  const clubName=c.name;
+  const stype=sw.stype;
+
+  // ラウンドからIDベースで対象ショットを再取得（番手＋スイング種類でフィルタ）
+  const refs=buildShotRefs(s=>
+    s.club&&s.club.replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').trim()===clubName&&
+    (s.stype||'フルショット')===stype&&
     s.hitdist&&s.hitdist>0
   );
-  // 飛距離分布バーチャート
-  const bucketsY=[0,20,40,60,80,100,120,140,160,180,200,220,240,260,280,300];
-  const bucketData=bucketsY.map((y,i)=>{const nx=bucketsY[i+1]||9999;return refs.filter(r=>r.s.hitdist>=y&&r.s.hitdist<nx).length;});
-  const maxB=Math.max(...bucketData,1);
-  const distChart=bucketsY.map((y,i)=>{const cnt=bucketData[i];if(!cnt)return'';const pct=Math.round(cnt/maxB*100);
-    return`<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px"><div style="width:48px;font-size:10px;color:var(--text-3);text-align:right;flex-shrink:0">${y}y〜</div><div style="flex:1;background:var(--border-lt);border-radius:2px;height:12px;overflow:hidden"><div style="width:${pct}%;height:100%;background:var(--blue);border-radius:2px"></div></div><div style="font-size:10px;color:var(--text-2);min-width:20px">${cnt}</div></div>`;
-  }).join('');
-  const summary=`<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center;margin-bottom:12px">
-    <div><div style="font-size:24px;font-weight:700;color:var(--blue)">${c.avg}y</div><div style="font-size:11px;color:var(--text-2)">平均飛距離</div></div>
-    <div><div style="font-size:24px;font-weight:700;color:${c.distStab>=75?'var(--green)':c.distStab>=55?'var(--amber)':'var(--red)'}">${c.distStab}%</div><div style="font-size:11px;color:var(--text-2)">距離安定性</div></div>
-    <div><div style="font-size:24px;font-weight:700;color:${c.dirStab>=70?'var(--green)':c.dirStab>=50?'var(--amber)':'var(--red)'}">${c.dirStab}%</div><div style="font-size:11px;color:var(--text-2)">方向性</div></div>
-  </div>
-  <div style="display:flex;gap:12px;font-size:12px;color:var(--text-2);justify-content:center;margin-bottom:10px">
-    <span>最大 <b>${c.max}y</b></span><span>最小 <b>${c.min}y</b></span><span>σ <b>${c.stddev}y</b></span>
-  </div>
-  ${distChart?`<div style="margin-top:8px"><div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:6px">飛距離分布</div>${distChart}</div>`:''}`;
-  openShotDetailOverlay('club-dist-overlay', `${c.name} の詳細`, refs, summary);
+
+  // 飛距離分布バーチャート（10y刻み）
+  function makeDistChart(refs){
+    const dists=refs.map(r=>r.s.hitdist);
+    if(!dists.length)return'';
+    const mn=Math.floor(Math.min(...dists)/20)*20;
+    const mx=Math.ceil(Math.max(...dists)/20)*20;
+    const buckets=[];
+    for(let y=mn;y<mx;y+=20)buckets.push(y);
+    const data=buckets.map(y=>refs.filter(r=>r.s.hitdist>=y&&r.s.hitdist<y+20).length);
+    const maxB=Math.max(...data,1);
+    return buckets.map((y,i)=>{
+      const cnt=data[i];if(!cnt)return'';
+      const pct=Math.round(cnt/maxB*100);
+      return`<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+        <div style="width:52px;font-size:10px;color:var(--text-3);text-align:right;flex-shrink:0">${y}〜${y+19}y</div>
+        <div style="flex:1;background:var(--border-lt);border-radius:2px;height:12px;overflow:hidden"><div style="width:${pct}%;height:100%;background:var(--blue);border-radius:2px"></div></div>
+        <div style="font-size:10px;color:var(--text-2);min-width:22px;text-align:right">${cnt}打</div>
+      </div>`;
+    }).join('');
+  }
+
+  const distCol=sw.distStab>=75?'var(--green)':sw.distStab>=55?'var(--amber)':'var(--red)';
+  const dirCol=sw.dirStab>=70?'var(--green)':sw.dirStab>=50?'var(--amber)':'var(--red)';
+  const chart=makeDistChart(refs);
+
+  const summary=`
+    <div style="text-align:center;margin-bottom:10px">
+      <div style="font-size:11px;color:var(--text-3);margin-bottom:4px">${stype}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+        <div><div style="font-size:26px;font-weight:700;color:var(--blue)">${sw.avg}y</div><div style="font-size:11px;color:var(--text-2)">平均</div></div>
+        <div><div style="font-size:26px;font-weight:700;color:${distCol}">${sw.distStab}%</div><div style="font-size:11px;color:var(--text-2)">距離安定</div></div>
+        <div><div style="font-size:26px;font-weight:700;color:${dirCol}">${sw.dirStab}%</div><div style="font-size:11px;color:var(--text-2)">方向性</div></div>
+      </div>
+      <div style="display:flex;justify-content:center;gap:14px;font-size:12px;color:var(--text-2);margin-top:8px">
+        <span>最大 <b>${sw.max}y</b></span><span>最小 <b>${sw.min}y</b></span><span>σ <b>${sw.stddev}y</b></span><span>${sw.n}打</span>
+      </div>
+    </div>
+    ${chart?`<div><div style="font-size:11px;font-weight:600;color:var(--text-2);margin-bottom:6px">飛距離分布</div>${chart}</div>`:''}`;
+
+  openShotDetailOverlay('club-dist-overlay', `${clubName}（${stype}）`, refs, summary);
 }
 
 // パット距離帯ごとのデータ一覧モーダル
@@ -3007,40 +3037,58 @@ function renderAnalysis(){
   });
   const missRank=Object.entries(missCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
 
-  // ─── 番手別飛距離・安定性分析 ───
-  const clubDistStats={};
+  // ─── 番手別×スイング別飛距離・安定性分析 ───
+  const clubDistStats={}; // {番手名: {スイング種類: {dists,accGoods,distGoods,bads,shots}}}
   const clubOrderFull=['1W','3W','5W','UT','3I','4I','5I','6I','7I','8I','9I','PW','AW','SW','LW'];
+  const swingOrder=['フルショット','3/4スイング','1/2スイング','アプローチ','ランニングアプローチ','バンカーショット'];
   allShots.forEach(s=>{
     if(!s.club||s.club.includes('パター'))return;
     if(!s.hitdist||s.hitdist<=0)return;
     const name=s.club.replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').trim();
-    if(!clubDistStats[name])clubDistStats[name]={dists:[],accGoods:0,distGoods:0,bads:0,shots:[]};
-    clubDistStats[name].dists.push(s.hitdist);
-    clubDistStats[name].shots.push(s);
-    if(s.acc&&(s.acc.startsWith('◎')||s.acc.startsWith('○')))clubDistStats[name].accGoods++;
-    if(s.distr&&(s.distr.startsWith('◎')||s.distr.startsWith('○')))clubDistStats[name].distGoods++;
-    if(isShotBad(s))clubDistStats[name].bads++;
+    const stype=s.stype||'フルショット';
+    if(!clubDistStats[name])clubDistStats[name]={};
+    if(!clubDistStats[name][stype])clubDistStats[name][stype]={dists:[],accGoods:0,distGoods:0,bads:0,shots:[]};
+    const st=clubDistStats[name][stype];
+    st.dists.push(s.hitdist);
+    st.shots.push(s);
+    if(s.acc&&(s.acc.startsWith('◎')||s.acc.startsWith('○')))st.accGoods++;
+    if(s.distr&&(s.distr.startsWith('◎')||s.distr.startsWith('○')))st.distGoods++;
+    if(isShotBad(s))st.bads++;
   });
 
-  // 番手別サマリー計算
+  // スイング別サマリー計算ヘルパー
+  function calcSwingSummary(stype, v){
+    const n=v.dists.length;
+    if(n<1)return null;
+    const avg=Math.round(v.dists.reduce((a,b)=>a+b,0)/n);
+    const max=Math.max(...v.dists);
+    const min=Math.min(...v.dists);
+    const stddev=n>1?Math.round(Math.sqrt(v.dists.reduce((a,d)=>a+Math.pow(d-avg,2),0)/n)):0;
+    const distStab=Math.max(0,100-Math.round(stddev/avg*100));
+    const dirStab=Math.round(v.accGoods/n*100);
+    return {stype,n,avg,max,min,stddev,distStab,dirStab,bads:v.bads,shots:v.shots};
+  }
+
+  // 番手別リスト（スイング別サマリー配列を持つ）
   const clubDistList=Object.entries(clubDistStats)
-    .filter(([,v])=>v.dists.length>=2)
     .sort((a,b)=>{
       const ia=clubOrderFull.indexOf(a[0]),ib=clubOrderFull.indexOf(b[0]);
       return (ia<0?99:ia)-(ib<0?99:ib);
     })
-    .map(([name,v])=>{
-      const n=v.dists.length;
-      const avg=Math.round(v.dists.reduce((a,b)=>a+b,0)/n);
-      const max=Math.max(...v.dists);
-      const min=Math.min(...v.dists);
-      const stddev=Math.round(Math.sqrt(v.dists.reduce((a,d)=>a+Math.pow(d-avg,2),0)/n));
-      const distStab=Math.max(0,100-Math.round(stddev/avg*100));
-      const dirStab=Math.round(v.accGoods/n*100);
-      return {name,n,avg,max,min,stddev,distStab,dirStab,bads:v.bads,shots:v.shots};
-    });
+    .map(([name,stypeMap])=>{
+      const swings=swingOrder
+        .filter(st=>stypeMap[st]&&stypeMap[st].dists.length>=1)
+        .map(st=>calcSwingSummary(st,stypeMap[st]))
+        .filter(Boolean);
+      // フルショットをベースに番手全体のavgを計算（フルがなければ全て）
+      const fullSwing=swings.find(s=>s.stype==='フルショット')||swings[0];
+      const totalN=swings.reduce((a,s)=>a+s.n,0);
+      if(!swings.length||totalN<1)return null;
+      return {name, swings, totalN, fullAvg:fullSwing?fullSwing.avg:0};
+    })
+    .filter(Boolean);
 
-  window._clubDistList=clubDistList; // データ一覧表示用
+  window._clubDistList=clubDistList;
 
   // インパクト感集計（パター除外）
   const impactCount={};
@@ -3426,22 +3474,35 @@ function renderAnalysis(){
 
   // 番手別飛距離HTMLの生成
   const clubDistHtml=clubDistList.map((c,ci)=>{
-    const distCol=c.distStab>=75?'var(--green)':c.distStab>=55?'var(--amber)':'var(--red)';
-    const dirCol=c.dirStab>=70?'var(--green)':c.dirStab>=50?'var(--amber)':'var(--red)';
-    return`<div onclick="openClubDistDetail(${ci})" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border-lt);cursor:pointer;-webkit-tap-highlight-color:transparent" ontouchstart="this.style.background='var(--bg)'" ontouchend="this.style.background=''">
-      <div style="width:36px;font-size:12px;font-weight:700;flex-shrink:0;text-align:center">${c.name}</div>
-      <div style="flex:1;min-width:0">
-        <div style="display:flex;align-items:baseline;gap:6px">
-          <span style="font-size:20px;font-weight:700;letter-spacing:-0.04em">${c.avg}</span>
-          <span style="font-size:11px;color:var(--text-2)">y平均 (${c.min}〜${c.max}y)</span>
+    // 番手ヘッダー行
+    const fullSw=c.swings.find(s=>s.stype==='フルショット')||c.swings[0];
+    const swingRows=c.swings.map((sw,si)=>{
+      const distCol=sw.distStab>=75?'var(--green)':sw.distStab>=55?'var(--amber)':'var(--red)';
+      const dirCol=sw.dirStab>=70?'var(--green)':sw.dirStab>=50?'var(--amber)':'var(--red)';
+      const stypeShort=sw.stype.replace('スイング','sw').replace('ショット','').replace('アプローチ','AP').replace('ランニング','Run');
+      return`<div onclick="openClubDistDetail(${ci},${si})" style="display:flex;align-items:center;gap:8px;padding:7px 0 7px 36px;border-bottom:0.5px solid var(--border-lt);cursor:pointer;-webkit-tap-highlight-color:transparent" ontouchstart="this.style.background='var(--bg)'" ontouchend="this.style.background=''">
+        <div style="width:56px;font-size:10px;color:var(--text-3);flex-shrink:0">${stypeShort}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:baseline;gap:4px">
+            <span style="font-size:17px;font-weight:700;letter-spacing:-0.04em">${sw.avg}</span>
+            <span style="font-size:10px;color:var(--text-2)">y (${sw.min}〜${sw.max})</span>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:2px">
+            <span style="font-size:10px;color:${distCol}">安定:${sw.distStab}%</span>
+            <span style="font-size:10px;color:${dirCol}">方向:${sw.dirStab}%</span>
+            <span style="font-size:10px;color:var(--text-3)">${sw.n}打</span>
+          </div>
         </div>
-        <div style="display:flex;gap:8px;margin-top:3px">
-          <span style="font-size:11px;color:${distCol}">距離安定:${c.distStab}%</span>
-          <span style="font-size:11px;color:${dirCol}">方向:${c.dirStab}%</span>
-          <span style="font-size:11px;color:var(--text-3)">${c.n}打</span>
-        </div>
+        <div style="font-size:10px;color:var(--text-3)">›</div>
+      </div>`;
+    }).join('');
+    return`<div>
+      <div style="display:flex;align-items:center;padding:10px 0 4px;border-bottom:0.5px solid var(--border)">
+        <div style="width:36px;font-size:13px;font-weight:800;flex-shrink:0;text-align:center;color:var(--green-dk)">${c.name}</div>
+        <div style="font-size:12px;color:var(--text-2)">${fullSw?fullSw.avg+'y（フル）':''}</div>
+        <div style="margin-left:auto;font-size:10px;color:var(--text-3)">${c.swings.length}種類 / 計${c.totalN}打</div>
       </div>
-      <div style="font-size:11px;color:var(--text-3)">›</div>
+      ${swingRows}
     </div>`;
   }).join('');
 
