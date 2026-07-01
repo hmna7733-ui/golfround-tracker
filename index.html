@@ -2339,11 +2339,16 @@ function rebuildPuttData(){
   const profData=loadProfile()||{};
   const strideCm=profData.strideLen||75;
   function ptM(dist,unit){
-    if(!dist||dist<=0)return null;
-    if(unit==='m')return dist;
-    if(unit==='y')return dist*0.9144;
-    if(unit==='歩数')return dist*strideCm/100;
-    return dist;
+    // dist=0も有効値として扱う（null/undefinedのみ除外）
+    if(dist===null||dist===undefined||dist<0)return null;
+    const u=unit||'y'; // デフォルトはy（ショット全体に合わせる）
+    let m;
+    if(u==='m')m=dist;
+    else if(u==='y')m=dist*0.9144;
+    else if(u==='歩数')m=dist*strideCm/100;
+    else m=dist;
+    // 小数第1位に丸め
+    return Math.round(m*10)/10;
   }
   const rounds=loadRounds();
   const fps=[];
@@ -2352,18 +2357,20 @@ function rebuildPuttData(){
     r.holes.forEach((h,hi)=>{
       const isIN=r.side==='IN';
       const dispNum=isIN?(hi<9?hi+10:hi-8):hi+1;
-      const ps=h.shots.filter(s=>s.club&&s.club.includes('パター'));
+      const ps=(h.shots||[]).filter(s=>s.club&&s.club.includes('パター'));
       if(!ps.length)return;
       const fp=ps[0];
-      if(!fp.dist)return;
-      const dm=ptM(fp.dist,fp.dist_unit||'歩数');
-      if(dm===null)return;
+      // dist が null/undefined/負の値のみスキップ（0は有効）
+      if(fp.dist===null||fp.dist===undefined)return;
+      const dm=ptM(fp.dist, fp.dist_unit||'y');
+      if(dm===null||dm<0)return;
       const made=fp.cupIn===true;
-      fps.push({distM:dm,made,ps,h,fp,
-        distOrig:fp.dist+(fp.dist_unit||'歩数'),
-        dispNum,roundDate:r.date||'',roundCourse:r.course||'',
-        par:h.par,holeObj:h,shotObj:fp,
-        roundId:r.id,holeIdx:hi
+      fps.push({
+        distM:dm, made, ps, h, fp,
+        distOrig:fp.dist+(fp.dist_unit||'y'),
+        dispNum, roundDate:r.date||'', roundCourse:r.course||'',
+        par:h.par, holeObj:h, shotObj:fp,
+        roundId:r.id, holeIdx:hi
       });
     });
   });
@@ -2416,8 +2423,8 @@ function openShotDetailOverlay(overlayId, title, shotRefs, summaryHtml){
   ov.id=overlayId;
   ov.style.cssText='position:fixed;inset:0;background:var(--card);z-index:500;overflow-y:auto;padding:0 0 40px';
   ov.innerHTML=`
-    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:calc(env(safe-area-inset-top,0px)+10px) 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
-      <button onclick="document.getElementById('${overlayId}')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:6px 8px">← 戻る</button>
+    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:calc(var(--safe-top) + 10px) 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
+      <button onclick="document.getElementById('${overlayId}')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:8px 10px;min-height:44px">← 戻る</button>
       <div style="flex:1;font-size:15px;font-weight:700;text-align:center">${title}</div>
       <div style="min-width:44px;text-align:right;font-size:12px;color:var(--text-2)">${shotRefs.length}件</div>
     </div>
@@ -2543,8 +2550,8 @@ function openPuttBandDetail(bandIdx){
   overlay.id='putt-band-overlay';
   overlay.style.cssText='position:fixed;inset:0;background:var(--card);z-index:500;overflow-y:auto;padding:0 0 40px';
   overlay.innerHTML=`
-    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
-      <button onclick="document.getElementById('putt-band-overlay')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:6px 8px">← 戻る</button>
+    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:calc(var(--safe-top) + 10px) 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
+      <button onclick="document.getElementById('putt-band-overlay')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:8px 10px;min-height:44px">← 戻る</button>
       <div style="flex:1;font-size:16px;font-weight:700;text-align:center">${title}</div>
       <div style="min-width:44px;text-align:right;font-size:13px;font-weight:700;color:${rate>=70?'var(--green)':'var(--amber)'}">${rate}%</div>
     </div>
@@ -2698,26 +2705,8 @@ function openMetricDetail(type){
     // 各帯：lo以上hi以下（hi=nullは上限なし）
     // 2m以内イン率 = 〜1m + 1〜2m（dist<=2）
     // 距離別2〜3m帯 = 2m超〜3m以下（dist>2 && dist<=3）
-    const bands=[
-      {label:'〜1m',  lo:0,   loEx:false, hi:1,   hiEx:false}, // 0<=dist<=1
-      {label:'1〜2m', lo:1,   loEx:true,  hi:2,   hiEx:false}, // 1<dist<=2
-      {label:'2〜3m', lo:2,   loEx:true,  hi:3,   hiEx:false}, // 2<dist<=3
-      {label:'3〜4m', lo:3,   loEx:true,  hi:4,   hiEx:false},
-      {label:'4〜5m', lo:4,   loEx:true,  hi:5,   hiEx:false},
-      {label:'5〜6m', lo:5,   loEx:true,  hi:6,   hiEx:false},
-      {label:'6〜7m', lo:6,   loEx:true,  hi:7,   hiEx:false},
-      {label:'7〜8m', lo:7,   loEx:true,  hi:8,   hiEx:false},
-      {label:'8〜9m', lo:8,   loEx:true,  hi:9,   hiEx:false},
-      {label:'9〜10m',lo:9,   loEx:true,  hi:10,  hiEx:false},
-      {label:'10m以上',lo:10, loEx:true,  hi:null,hiEx:false},
-    ];
-
-    // データ一覧モーダルを開く関数（グローバル）
-    window._puttBands=bands;
-    window._puttFps=fps;
-    window._puttPtM=ptM;
-    // renderAnalysisからも呼ばれるよう更新用関数も登録
-    window._puttDataReady=true;
+    // rebuildPuttData で設定済みのbandsを使用
+    const bands=window._puttBands;
 
     const distRows=bands.map((b,bi)=>{
       const inR=getRange(b);
@@ -2744,7 +2733,7 @@ function openMetricDetail(type){
       const idx=ps.indexOf(fpShot);
       if(idx<0||idx+1>=ps.length)return;
       const nx=ps[idx+1];if(!nx.dist)return;
-      const nm=ptM(nx.dist,nx.dist_unit||'歩数');
+      const nm=ptM(nx.dist,nx.dist_unit||'y');
       if(nm!==null&&nm<2)near++;
     });
     const nr=lps.length?Math.round(near/lps.length*100):null;
@@ -2892,11 +2881,14 @@ function renderAnalysis(){
 
   // 距離をmに変換するヘルパー
   function puttDistToM(dist,unit){
-    if(!dist||dist<=0)return null;
-    if(unit==='m')return dist;
-    if(unit==='y')return dist*0.9144;
-    if(unit==='歩数')return dist*strideCm/100;
-    return dist; // 単位不明はそのまま
+    if(dist===null||dist===undefined||dist<0)return null;
+    const u=unit||'y';
+    let m;
+    if(u==='m')m=dist;
+    else if(u==='y')m=dist*0.9144;
+    else if(u==='歩数')m=dist*(strideCm/100);
+    else m=dist;
+    return Math.round(m*10)/10; // 小数第1位に丸め
   }
 
   // パットの第1打（その穴の最初のパット）を収集
@@ -2906,7 +2898,7 @@ function renderAnalysis(){
     if(!ps.length)return;
     const fp=ps[0];
     if(!fp.dist)return;
-    const dm=puttDistToM(fp.dist,fp.dist_unit||'歩数');
+    const dm=puttDistToM(fp.dist,fp.dist_unit||'y');
     if(dm===null)return;
     const holed=fp.cupIn||(ps.length===1&&fp.cupIn!==false&&ps.length===1); // カップインか
     // cupInフラグで判定
@@ -2934,7 +2926,7 @@ function renderAnalysis(){
     if(idx<0||idx+1>=ps.length)return;
     const next=ps[idx+1];
     if(!next.dist)return;
-    const nm=puttDistToM(next.dist,next.dist_unit||'歩数');
+    const nm=puttDistToM(next.dist,next.dist_unit||'y');
     if(nm!==null&&nm<2)nearMiss2m++;
   });
   const nearRate=longPutts2plus.length?Math.round(nearMiss2m/longPutts2plus.length*100):null;
@@ -3606,10 +3598,8 @@ function renderAnalysis(){
     <div style="height:calc(var(--safe-bot)+24px)"></div>
   `;
   // renderAnalysis完了後にパット計算データをグローバルに保持
-  window._analysisPuttShots=puttShots;
-  window._analysisAllShots=allShots;
-  window._analysisAllHoles=allHoles;
-  window._analysisAllRounds=allRounds;
+  // renderAnalysis完了後にパットデータを最新で再構築しておく
+  rebuildPuttData();
 }
 
 // ===== SHARE / IMPORT =====
