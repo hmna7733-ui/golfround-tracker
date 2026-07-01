@@ -2365,13 +2365,16 @@ function rebuildPuttData(){
         const dm=ptM(fp.dist, fp.dist_unit||'y');
         if(dm===null||dm<0)return;
         const made=fp.cupIn===true;
+        // h.shots全体でのshotIdxを特定
+        const shotIdxInHole=(h.shots||[]).indexOf(fp);
         fps.push({
           distM:dm, made, ps, h, fp,
           distOrig:fp.dist+(fp.dist_unit||'y'),
           dispNum, roundDate:r.date||'', roundCourse:r.course||'',
           par:h.par, holeObj:h, shotObj:fp,
           roundId:r.id, holeIdx:hi,
-          puttIdx:pi  // 何打目のパットか（0=第1パット）
+          shotIdx:shotIdxInHole>=0?shotIdxInHole:pi,
+          puttIdx:pi
         });
       });
     });
@@ -2443,8 +2446,18 @@ function editOverlayShot(overlayId, ri){
   if(!ov||!ov._shotRefs)return;
   const ref=ov._shotRefs[ri];
   if(!ref)return;
+  // オーバーレイを閉じる前にfromScreenを記録（s8=分析画面）
+  s12Context.fromScreen='s8';
+  s12Context.type=s12Context.type||'';
+  s12Context.key=s12Context.key||'';
+  s12Context.title=s12Context.title||'';
   ov.remove();
-  openHistoryDetail(ref.roundId, ref.holeIdx);
+  // 直接ショットフォームへ
+  if(typeof editShotFromS12==='function'&&ref.roundId!==undefined&&ref.holeIdx!==undefined&&ref.shotIdx!==undefined){
+    editShotFromS12(ref.roundId, ref.holeIdx, ref.shotIdx);
+  } else {
+    openHistoryDetail(ref.roundId);
+  }
 }
 
 // ラウンドデータからshotRefsを作るヘルパー
@@ -2607,15 +2620,26 @@ function editPuttFromDetail(idx){
   if(!overlay||!overlay._targets)return;
   const target=overlay._targets[idx];
   if(!target)return;
+  // fromScreenを記録してからオーバーレイを閉じる
+  s12Context.fromScreen='s8';
+  s12Context.type=s12Context.type||'';
+  s12Context.key=s12Context.key||'';
+  s12Context.title=s12Context.title||'';
   overlay.remove();
-  // roundId と holeIdx を直接使用（rebuildPuttData で保存済み）
-  if(target.roundId!==undefined&&target.holeIdx!==undefined){
-    openHistoryDetail(target.roundId, target.holeIdx);
+  // roundId・holeIdx・shotIdx が揃っていれば直接ショットフォームへ
+  if(typeof editShotFromS12==='function'
+     &&target.roundId!==undefined
+     &&target.holeIdx!==undefined
+     &&target.shotIdx!==undefined){
+    editShotFromS12(target.roundId, target.holeIdx, target.shotIdx);
+  } else if(target.roundId!==undefined&&target.holeIdx!==undefined){
+    // shotIdxがない場合はホール先頭へ（フォールバック）
+    openHistoryDetail(target.roundId);
   } else {
     const rounds=loadRounds();
     const r=rounds.find(r=>r.date===target.roundDate&&r.course===target.roundCourse);
     if(!r){showToastMsg('ラウンドデータが見つかりません');return;}
-    openHistoryDetail(r.id, target.dispNum-1);
+    openHistoryDetail(r.id);
   }
 }
 
@@ -4344,6 +4368,10 @@ function editShotFromS12(roundId,holeIdx,shotIdx){
   const prevR={...R};const prevHoles=[...holes];const prevCurHole=curHole;
   R={...r};holes=r.holes.map(h=>({...h,shots:[...(h.shots||[])]}));
   curHole=holeIdx;
+  // fromScreenが未設定の場合は現在の画面を記録（分析から来た場合はs8）
+  if(!s12Context.fromScreen){
+    s12Context.fromScreen=document.querySelector('.screen.active')?.id||'s8';
+  }
   s12Context._prevR=prevR;s12Context._prevHoles=prevHoles;s12Context._prevCurHole=prevCurHole;
   s12Context._editingRoundId=roundId;s12Context._editingHole=holeIdx;s12Context._editingShot=shotIdx;
   openShotForm(shotIdx);
