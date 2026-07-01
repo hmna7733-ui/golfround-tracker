@@ -2288,6 +2288,124 @@ function showSummary(){
 // ===== ANALYSIS =====
 function openAnalysis(){goTo('s8');renderAnalysis();}
 
+// 番手別詳細モーダル
+function openClubDistDetail(idx){
+  const list=window._clubDistList||[];
+  const c=list[idx];
+  if(!c)return;
+
+  // ショット一覧行
+  const rows=c.shots.map((s,si)=>{
+    const isP=s.club&&s.club.includes('パター');
+    const du=s.dist_unit||'y';
+    const distStr=s.dist?`残${s.dist}${du}`:'';
+    const hitStr=s.hitdist?`${s.hitdist}y`:'';
+    const accTxt=s.acc?s.acc.replace(/（.*?）/,''):'';
+    const dirTxt=s.dir&&s.dir!=='センター（目標通り）'?s.dir:'';
+    const impTxt=s.impact?s.impact.replace(/（.*?）/,''):'';
+    const isBad=s.impact&&s.impact.startsWith('×');
+    const badCol=isBad?'color:var(--red)':'';
+    // ラウンド情報（allHolesから探す）
+    const roundRounds=loadRounds();
+    let rDate='',rCourse='',dispN='';
+    for(const r of roundRounds){
+      if(!r.holes)continue;
+      for(let hi=0;hi<r.holes.length;hi++){
+        const h=r.holes[hi];
+        if(h.shots&&h.shots.includes(s)){
+          rDate=r.date||'';rCourse=r.course||'';
+          const isIN=r.side==='IN';
+          dispN=isIN?(hi<9?hi+10:hi-8):hi+1;
+          break;
+        }
+      }
+      if(rDate)break;
+    }
+    return`<div style="display:flex;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:0.5px solid var(--border-lt)">
+      <div style="flex-shrink:0;text-align:center;width:28px">
+        <div style="font-size:11px;color:var(--text-3)">${dispN?dispN+'番':''}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${rCourse}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:1px">${rDate}${distStr?' · '+distStr:''}</div>
+        <div style="font-size:12px;margin-top:3px;${badCol}">${[accTxt,dirTxt,impTxt].filter(Boolean).join(' · ')}</div>
+      </div>
+      <div style="flex-shrink:0;text-align:right">
+        <div style="font-size:18px;font-weight:700;color:${hitStr?'var(--text)':'var(--text-3)'}">${hitStr||'-'}</div>
+        <div style="font-size:10px;color:var(--text-3)">飛距離</div>
+      </div>
+      <button onclick="editClubShot(${si})" style="flex-shrink:0;background:none;border:0.5px solid var(--green);color:var(--green);font-size:12px;cursor:pointer;padding:4px 8px;border-radius:6px;margin-top:2px">編集</button>
+    </div>`;
+  });
+
+  // バーチャートで分布表示
+  const bucketsY=[0,20,40,60,80,100,120,140,160,180,200,220,240];
+  const bucketData=bucketsY.map((y,i)=>{
+    const next=bucketsY[i+1]||9999;
+    return c.dists.filter(d=>d>=y&&d<next).length;
+  });
+  const maxB=Math.max(...bucketData)||1;
+  const distChart=bucketsY.map((y,i)=>{
+    const cnt=bucketData[i];if(!cnt)return'';
+    const pct=Math.round(cnt/maxB*100);
+    return`<div style="display:flex;align-items:center;gap:6px;margin-bottom:3px">
+      <div style="width:44px;font-size:10px;color:var(--text-3);text-align:right;flex-shrink:0">${y}y〜</div>
+      <div style="flex:1;background:var(--border-lt);border-radius:2px;height:12px;overflow:hidden"><div style="width:${pct}%;height:100%;background:var(--blue);border-radius:2px"></div></div>
+      <div style="font-size:10px;color:var(--text-2);min-width:20px">${cnt}</div>
+    </div>`;
+  }).join('');
+
+  const overlay=document.createElement('div');
+  overlay.id='club-dist-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:var(--card);z-index:500;overflow-y:auto;padding:0 0 40px';
+  overlay.innerHTML=`
+    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
+      <button onclick="document.getElementById('club-dist-overlay')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:6px 8px">← 戻る</button>
+      <div style="flex:1;font-size:16px;font-weight:700;text-align:center">${c.name} の分析</div>
+      <div style="min-width:44px;text-align:right;font-size:13px;color:var(--text-2)">${c.n}打</div>
+    </div>
+    <div style="padding:16px;background:var(--blue-lt);margin:0 0 16px">
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;text-align:center">
+        <div><div style="font-size:28px;font-weight:700;color:var(--blue)">${c.avg}y</div><div style="font-size:11px;color:var(--text-2);margin-top:2px">平均飛距離</div></div>
+        <div><div style="font-size:28px;font-weight:700;color:${c.distStab>=75?'var(--green)':c.distStab>=55?'var(--amber)':'var(--red)'}">${c.distStab}%</div><div style="font-size:11px;color:var(--text-2);margin-top:2px">距離安定性</div></div>
+        <div><div style="font-size:28px;font-weight:700;color:${c.dirStab>=70?'var(--green)':c.dirStab>=50?'var(--amber)':'var(--red)'}">${c.dirStab}%</div><div style="font-size:11px;color:var(--text-2);margin-top:2px">方向性</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin-top:12px;font-size:12px;color:var(--text-2)">
+        <div>最大 <b>${c.max}y</b></div>
+        <div>最小 <b>${c.min}y</b></div>
+        <div>σ <b>${c.stddev}y</b></div>
+      </div>
+    </div>
+    ${distChart?`<div style="padding:12px 16px"><div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:8px">飛距離分布</div>${distChart}</div>`:''}
+    <div style="padding:0 16px">
+      <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:4px;margin-top:4px">全ショット一覧</div>
+      ${rows.join('')}
+    </div>
+  `;
+  overlay._shots=c.shots;
+  document.body.appendChild(overlay);
+}
+
+function editClubShot(si){
+  const overlay=document.getElementById('club-dist-overlay');
+  if(!overlay||!overlay._shots)return;
+  const s=overlay._shots[si];
+  if(!s)return;
+  const rounds=loadRounds();
+  for(const r of rounds){
+    if(!r.holes)continue;
+    for(let hi=0;hi<r.holes.length;hi++){
+      const h=r.holes[hi];
+      if(h.shots&&h.shots.includes(s)){
+        overlay.remove();
+        openHistoryDetail(r.id,hi);
+        return;
+      }
+    }
+  }
+  showToastMsg('ラウンドが見つかりません');
+}
+
 // パット距離帯ごとのデータ一覧モーダル
 function openPuttBandDetail(bandIdx){
   const bands=window._puttBands||[];
@@ -2792,14 +2910,22 @@ function renderAnalysis(){
     .filter(([,v])=>v.n>=2)
     .sort((a,b)=>{const ia=clubOrder.indexOf(a[0]),ib=clubOrder.indexOf(b[0]);return(ia<0?99:ia)-(ib<0?99:ib);});
 
+  // ショットミス判定ヘルパー（s.miss は未使用→acc/impactで代替）
+  function isShotBad(s){
+    const isP=s.club&&s.club.includes('パター');
+    if(isP) return s.acc&&s.acc.startsWith('×');
+    return (s.acc&&s.acc.startsWith('×'))||(s.impact&&s.impact.startsWith('×'));
+  }
+
   // ライ別ミス率
   const lieStats={};
   allShots.forEach(s=>{
     if(!s.lie)return;
-    const lie=s.lie.replace(/（.*?）/,'');
-    if(!lieStats[lie])lieStats[lie]={n:0,miss:0};
+    const lie=s.lie.replace(/（.*?）/g,'');
+    if(!lieStats[lie])lieStats[lie]={n:0,miss:0,shots:[]};
     lieStats[lie].n++;
-    if(s.miss&&s.miss!=='ミスなし')lieStats[lie].miss++;
+    if(isShotBad(s))lieStats[lie].miss++;
+    lieStats[lie].shots.push(s);
   });
   const lieList=Object.entries(lieStats).filter(([,v])=>v.n>=2)
     .sort((a,b)=>b[1].miss/b[1].n-a[1].miss/a[1].n);
@@ -2810,13 +2936,50 @@ function renderAnalysis(){
     if(!s.slope||s.slope==='フラット')return;
     if(!slopeStats[s.slope])slopeStats[s.slope]={n:0,miss:0};
     slopeStats[s.slope].n++;
-    if(s.miss&&s.miss!=='ミスなし')slopeStats[s.slope].miss++;
+    if(isShotBad(s))slopeStats[s.slope].miss++;
   });
 
-  // ミスの種類ランキング
+  // ミスの種類ランキング（impactの×系）
   const missCount={};
-  allShots.forEach(s=>{if(s.miss&&s.miss!=='ミスなし')missCount[s.miss]=(missCount[s.miss]||0)+1;});
+  allShots.filter(s=>!(s.club&&s.club.includes('パター'))).forEach(s=>{
+    if(s.impact&&s.impact.startsWith('×'))missCount[s.impact]=(missCount[s.impact]||0)+1;
+  });
   const missRank=Object.entries(missCount).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // ─── 番手別飛距離・安定性分析 ───
+  const clubDistStats={};
+  const clubOrderFull=['1W','3W','5W','UT','3I','4I','5I','6I','7I','8I','9I','PW','AW','SW','LW'];
+  allShots.forEach(s=>{
+    if(!s.club||s.club.includes('パター'))return;
+    if(!s.hitdist||s.hitdist<=0)return;
+    const name=s.club.replace(/（.*?）/g,'').replace(/\(.*?\)/g,'').trim();
+    if(!clubDistStats[name])clubDistStats[name]={dists:[],accGoods:0,distGoods:0,bads:0,shots:[]};
+    clubDistStats[name].dists.push(s.hitdist);
+    clubDistStats[name].shots.push(s);
+    if(s.acc&&(s.acc.startsWith('◎')||s.acc.startsWith('○')))clubDistStats[name].accGoods++;
+    if(s.distr&&(s.distr.startsWith('◎')||s.distr.startsWith('○')))clubDistStats[name].distGoods++;
+    if(isShotBad(s))clubDistStats[name].bads++;
+  });
+
+  // 番手別サマリー計算
+  const clubDistList=Object.entries(clubDistStats)
+    .filter(([,v])=>v.dists.length>=2)
+    .sort((a,b)=>{
+      const ia=clubOrderFull.indexOf(a[0]),ib=clubOrderFull.indexOf(b[0]);
+      return (ia<0?99:ia)-(ib<0?99:ib);
+    })
+    .map(([name,v])=>{
+      const n=v.dists.length;
+      const avg=Math.round(v.dists.reduce((a,b)=>a+b,0)/n);
+      const max=Math.max(...v.dists);
+      const min=Math.min(...v.dists);
+      const stddev=Math.round(Math.sqrt(v.dists.reduce((a,d)=>a+Math.pow(d-avg,2),0)/n));
+      const distStab=Math.max(0,100-Math.round(stddev/avg*100));
+      const dirStab=Math.round(v.accGoods/n*100);
+      return {name,n,avg,max,min,stddev,distStab,dirStab,bads:v.bads,shots:v.shots};
+    });
+
+  window._clubDistList=clubDistList; // データ一覧表示用
 
   // インパクト感集計（パター除外）
   const impactCount={};
@@ -3200,6 +3363,27 @@ function renderAnalysis(){
     return`<div class="trend-row"><div class="trend-dot" style="background:${col}"></div><div style="flex:1">${t.course}</div><div style="font-size:12px;color:var(--text-2)">${t.date.slice(5)}</div><div style="font-weight:700;color:${col};margin-left:8px">${t.score}<span style="font-size:11px;font-weight:500"> (${vsStr})</span></div></div>`;
   }).join(''):'';
 
+  // 番手別飛距離HTMLの生成
+  const clubDistHtml=clubDistList.map((c,ci)=>{
+    const distCol=c.distStab>=75?'var(--green)':c.distStab>=55?'var(--amber)':'var(--red)';
+    const dirCol=c.dirStab>=70?'var(--green)':c.dirStab>=50?'var(--amber)':'var(--red)';
+    return`<div onclick="openClubDistDetail(${ci})" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border-lt);cursor:pointer;-webkit-tap-highlight-color:transparent" ontouchstart="this.style.background='var(--bg)'" ontouchend="this.style.background=''">
+      <div style="width:36px;font-size:12px;font-weight:700;flex-shrink:0;text-align:center">${c.name}</div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:baseline;gap:6px">
+          <span style="font-size:20px;font-weight:700;letter-spacing:-0.04em">${c.avg}</span>
+          <span style="font-size:11px;color:var(--text-2)">y平均 (${c.min}〜${c.max}y)</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:3px">
+          <span style="font-size:11px;color:${distCol}">距離安定:${c.distStab}%</span>
+          <span style="font-size:11px;color:${dirCol}">方向:${c.dirStab}%</span>
+          <span style="font-size:11px;color:var(--text-3)">${c.n}打</span>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3)">›</div>
+    </div>`;
+  }).join('');
+
   // クラブ別HTMLはスペースの都合で上位7本
   const clubHtml=clubList.slice(0,7).map(([name,cs])=>{
     const accR=cs.n?Math.round(cs.accGood/cs.n*100):0;
@@ -3299,18 +3483,13 @@ function renderAnalysis(){
       </div>
     </div>
 
-    ${insights.length?`<div class="sec-lbl">優先改善ポイント</div>${insightHtml}`:''}
+    ${clubDistHtml?`<div class="sec-lbl">番手別飛距離・安定性（タップで詳細）</div>
+    <div style="font-size:12px;color:var(--text-2);padding:0 4px 6px;line-height:1.5">hitdistデータがある打数のみ集計。距離安定は標準偏差から算出（高いほど安定）。</div>
+    <div class="card" style="padding:4px 16px">${clubDistHtml}</div>`:''}
 
-    ${clubHtml?`<div class="sec-lbl">クラブ別の精度（方向・距離が良かった割合）</div>
-    <div style="font-size:12px;color:var(--text-2);padding:0 4px 6px;line-height:1.5">方向＝狙った方向に打てた割合、距離＝狙った距離感だった割合。70%以上が目安。</div>
-    <div class="card" style="padding:8px 16px">${clubHtml}</div>`:''}
-
-    ${lieHtml?`<div class="sec-lbl">ボールの状況別ミス率</div>
-    <div style="font-size:12px;color:var(--text-2);padding:0 4px 6px;line-height:1.5">「ライ」とはボールが止まっている場所の状態のこと。どの状況でミスが多いかを示します。</div>
+    ${lieHtml?`<div class="sec-lbl">ボールの状況別ミス率（ライ別）</div>
+    <div style="font-size:12px;color:var(--text-2);padding:0 4px 6px;line-height:1.5">ライ（ボールの置かれた状況）ごとのミス率。評価×が多い状況を示します。</div>
     <div class="insight-card" style="padding:14px 16px">${lieHtml}</div>`:''}
-
-    ${missHtml?`<div class="sec-lbl">多かったミスショット TOP5</div>
-    <div class="card" style="padding:8px 16px">${missHtml}</div>`:''}
 
     ${puttTouchTotal>=3?`<div class="sec-lbl">パットのタッチ内訳</div>
     <div class="card" style="padding:8px 16px">
@@ -3324,6 +3503,15 @@ function renderAnalysis(){
       const cols=['var(--red)','var(--red)','var(--amber)','var(--amber)','var(--text-2)'];
       return`<div class="trend-row"><div style="font-size:12px;color:var(--text-3);width:16px">${i+1}</div><div style="flex:1">${imp}</div><div style="font-weight:700;color:${cols[i]}">${cnt}回</div></div>`;
     }).join('')}</div>`:''}
+
+    ${insights.length?`<div class="sec-lbl">優先改善ポイント</div>${insightHtml}`:''}
+
+    ${clubHtml?`<div class="sec-lbl">クラブ別の精度（方向・距離が良かった割合）</div>
+    <div style="font-size:12px;color:var(--text-2);padding:0 4px 6px;line-height:1.5">方向＝狙った方向に打てた割合、距離＝狙った距離感だった割合。70%以上が目安。</div>
+    <div class="card" style="padding:8px 16px">${clubHtml}</div>`:''}
+
+    ${missHtml?`<div class="sec-lbl">多かったミスショット TOP5</div>
+    <div class="card" style="padding:8px 16px">${missHtml}</div>`:''}
 
     <div style="height:calc(var(--safe-bot)+24px)"></div>
   `;
