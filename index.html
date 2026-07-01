@@ -2298,12 +2298,17 @@ function openPuttBandDetail(bandIdx){
   if(bandIdx===-1){
     // 2m以内イン率の詳細
     title='2m以内のパット一覧';
-    targets=fps.filter(p=>p.distM<2);
+    targets=fps.filter(p=>p.distM<=2);
   }else{
     const b=bands[bandIdx];
     if(!b)return;
     title=b.label+'のパット一覧';
-    targets=fps.filter(p=>p.distM>=b.lo&&(b.hi===null?true:p.distM<b.hi));
+    targets=fps.filter(p=>{
+      const d=p.distM,lo=b.lo,hi=b.hi,loEx=b.loEx,hiEx=b.hiEx;
+      const loOk=loEx?(d>lo):(d>=lo);
+      const hiOk=hi===null?true:(hiEx?(d<hi):(d<=hi));
+      return loOk&&hiOk;
+    });
   }
 
   if(!targets.length){showToastMsg('データがありません');return;}
@@ -2339,8 +2344,8 @@ function openPuttBandDetail(bandIdx){
   overlay.id='putt-band-overlay';
   overlay.style.cssText='position:fixed;inset:0;background:var(--card);z-index:500;overflow-y:auto;padding:0 0 40px';
   overlay.innerHTML=`
-    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:12px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
-      <button onclick="document.getElementById('putt-band-overlay')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:4px">← 戻る</button>
+    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
+      <button onclick="document.getElementById('putt-band-overlay')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:6px 8px">← 戻る</button>
       <div style="flex:1;font-size:16px;font-weight:700;text-align:center">${title}</div>
       <div style="min-width:44px;text-align:right;font-size:13px;font-weight:700;color:${rate>=70?'var(--green)':'var(--amber)'}">${rate}%</div>
     </div>
@@ -2498,24 +2503,34 @@ function openMetricDetail(type){
     const fps_u2=fps.filter(p=>p.distM<2);   // 0〜2m未満
     const fps_2=fps.filter(p=>p.distM>=2&&p.distM<3); // 2〜3m帯
     // 「2m以内」= 0〜2m未満の帯（1m以下 + 1〜2m）
-    const fps2all=fps.filter(p=>p.distM<2);
+    const fps2all=fps.filter(p=>p.distM<=2);
     const fps2made=fps2all.filter(p=>p.made).length;
     const r2=fps2all.length?Math.round(fps2made/fps2all.length*100):null;
 
     // ── 距離別（1m以下、1〜2m、2〜3m ... 10m以上）──
-    function getRange(lo,hi){return fps.filter(p=>p.distM>=lo&&(hi===null?true:p.distM<hi));}
+    function getRange(b){const lo=b.lo,hi=b.hi,loEx=b.loEx,hiEx=b.hiEx;
+      return fps.filter(p=>{
+        const d=p.distM;
+        const loOk=loEx?(d>lo):(d>=lo);
+        const hiOk=hi===null?true:(hiEx?(d<hi):(d<=hi));
+        return loOk&&hiOk;
+      });
+    }
+    // 各帯：lo以上hi以下（hi=nullは上限なし）
+    // 2m以内イン率 = 〜1m + 1〜2m（dist<=2）
+    // 距離別2〜3m帯 = 2m超〜3m以下（dist>2 && dist<=3）
     const bands=[
-      {label:'〜1m', lo:0,   hi:1},
-      {label:'1〜2m',lo:1,   hi:2},
-      {label:'2〜3m',lo:2,   hi:3},
-      {label:'3〜4m',lo:3,   hi:4},
-      {label:'4〜5m',lo:4,   hi:5},
-      {label:'5〜6m',lo:5,   hi:6},
-      {label:'6〜7m',lo:6,   hi:7},
-      {label:'7〜8m',lo:7,   hi:8},
-      {label:'8〜9m',lo:8,   hi:9},
-      {label:'9〜10m',lo:9,  hi:10},
-      {label:'10m以上',lo:10,hi:null},
+      {label:'〜1m',  lo:0,   loEx:false, hi:1,   hiEx:false}, // 0<=dist<=1
+      {label:'1〜2m', lo:1,   loEx:true,  hi:2,   hiEx:false}, // 1<dist<=2
+      {label:'2〜3m', lo:2,   loEx:true,  hi:3,   hiEx:false}, // 2<dist<=3
+      {label:'3〜4m', lo:3,   loEx:true,  hi:4,   hiEx:false},
+      {label:'4〜5m', lo:4,   loEx:true,  hi:5,   hiEx:false},
+      {label:'5〜6m', lo:5,   loEx:true,  hi:6,   hiEx:false},
+      {label:'6〜7m', lo:6,   loEx:true,  hi:7,   hiEx:false},
+      {label:'7〜8m', lo:7,   loEx:true,  hi:8,   hiEx:false},
+      {label:'8〜9m', lo:8,   loEx:true,  hi:9,   hiEx:false},
+      {label:'9〜10m',lo:9,   loEx:true,  hi:10,  hiEx:false},
+      {label:'10m以上',lo:10, loEx:true,  hi:null,hiEx:false},
     ];
 
     // データ一覧モーダルを開く関数（グローバル）
@@ -2524,7 +2539,7 @@ function openMetricDetail(type){
     window._puttPtM=ptM;
 
     const distRows=bands.map((b,bi)=>{
-      const inR=getRange(b.lo,b.hi);
+      const inR=getRange(b);
       if(inR.length===0)return'';
       const mk=inR.filter(p=>p.made).length;
       const rate=Math.round(mk/inR.length*100);
