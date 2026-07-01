@@ -741,9 +741,11 @@ html,body{height:100%;background:var(--bg);font-family:-apple-system,BlinkMacSys
     <div class="drum-wrap">
       <div class="d-fade-t"></div><div class="d-fade-b"></div>
       <div class="drum-multicol">
-        <div class="dcol"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dc100"></div><div class="dcol-lbl">百</div></div>
+        <div class="dcol" id="dcol-100"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dc100"></div><div class="dcol-lbl">百</div></div>
         <div class="dcol"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dc10"></div><div class="dcol-lbl">十</div></div>
         <div class="dcol"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dc1"></div><div class="dcol-lbl">一</div></div>
+        <div id="dcol-dot" style="display:none;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:var(--text-2);padding:0 2px;margin-bottom:20px;flex-shrink:0">.</div>
+        <div class="dcol" id="dcol-01" style="display:none;flex:0.7"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dc01"></div><div class="dcol-lbl">小数</div></div>
         <div class="dcol" style="flex:0.6"><div class="d-fade-t"></div><div class="d-fade-b"></div><div class="d-sel"></div><div class="d-scroll" id="dcU"></div><div class="dcol-lbl">単位</div></div>
       </div>
     </div>
@@ -2162,28 +2164,63 @@ function openDistAdaptive(title,key){distIsPutt=isPutt();openDist(title,key,dist
 function openDist(title,key,isPuttMode){
   distKey=key;document.getElementById('dist-ttl').textContent=title;
   const units=isPuttMode?['歩数','y','m']:['y','m'];
-  const cur=DV[key];let n=0;if(cur&&cur!=='-')n=parseInt(cur)||0;
-  let curUnitIdx=0;if(cur&&cur!=='-'){const m=cur.match(/[^\d]+$/);if(m){const ci=units.indexOf(m[0]);if(ci>=0)curUnitIdx=ci;}}
-  fillDCol('dc100',[0,1,2,3,4,5],Math.floor(n/100));
-  fillDCol('dc10',Array.from({length:10},(_,i)=>i),Math.floor((n%100)/10));
-  fillDCol('dc1',Array.from({length:10},(_,i)=>i),n%10);
+  const cur=DV[key];
+  let nInt=0,nDec=0;
+  if(cur&&cur!=='-'){
+    const numStr=cur.match(/[\d.]+/);
+    if(numStr){const fv=parseFloat(numStr[0])||0;nInt=Math.floor(fv);nDec=Math.round((fv-nInt)*10);}
+  }
+  let curUnitIdx=0;if(cur&&cur!=='-'){const m=cur.match(/[^\d.]+$/);if(m){const ci=units.indexOf(m[0]);if(ci>=0)curUnitIdx=ci;}}
+  // パターモード：百の位非表示・小数列表示
+  const dec01Dot=document.getElementById('dcol-dot');
+  const dec01Col=document.getElementById('dcol-01');
+  const col100=document.getElementById('dcol-100');
+  if(isPuttMode&&key!=='hs-hdist'){
+    if(dec01Dot)dec01Dot.style.display='flex';
+    if(dec01Col)dec01Col.style.display='';
+    if(col100)col100.style.display='none';
+    fillDCol('dc10',Array.from({length:10},(_,i)=>i),Math.floor(nInt/10));
+    fillDCol('dc1',Array.from({length:10},(_,i)=>i),nInt%10);
+    fillDCol('dc01',Array.from({length:10},(_,i)=>i),nDec);
+  }else{
+    if(dec01Dot)dec01Dot.style.display='none';
+    if(dec01Col)dec01Col.style.display='none';
+    if(col100)col100.style.display='';
+    fillDCol('dc100',[0,1,2,3,4,5],Math.floor(nInt/100));
+    fillDCol('dc10',Array.from({length:10},(_,i)=>i),Math.floor((nInt%100)/10));
+    fillDCol('dc1',Array.from({length:10},(_,i)=>i),nInt%10);
+  }
   fillDCol('dcU',units,curUnitIdx);
   document.getElementById('dist-ov').classList.add('open');
 }
 function closeDist(save){
   if(save){
-    const h100=[0,1,2,3,4,5];const isPuttMode=distIsPutt&&distKey!=='hs-hdist';
+    const isPuttMode=distIsPutt&&distKey!=='hs-hdist';
     const units=isPuttMode?['歩数','y','m']:['y','m'];
-    const i100=getIdx(document.getElementById('dc100'),6);
-    const i10=getIdx(document.getElementById('dc10'),10);
-    const i1=getIdx(document.getElementById('dc1'),10);
     const iU=getIdx(document.getElementById('dcU'),units.length);
-    const num=h100[i100]*100+i10*10+i1;const unit=units[iU];
-    DV[distKey]=num>0?num+unit:'-';
-    const el=document.getElementById(distKey+'-v');if(el){el.textContent=num>0?num+unit:'-';el.className=num>0?'fr-val set':'fr-val';}
+    const unit=units[iU];
+    let num,numStr;
+    if(isPuttMode){
+      const i10=getIdx(document.getElementById('dc10'),10);
+      const i1=getIdx(document.getElementById('dc1'),10);
+      const i01=getIdx(document.getElementById('dc01'),10);
+      const intPart=i10*10+i1;
+      num=intPart+i01*0.1;
+      numStr=i01>0?(intPart+'.'+i01):String(intPart);
+    }else{
+      const h100=[0,1,2,3,4,5];
+      const i100=getIdx(document.getElementById('dc100'),6);
+      const i10=getIdx(document.getElementById('dc10'),10);
+      const i1=getIdx(document.getElementById('dc1'),10);
+      num=h100[i100]*100+i10*10+i1;
+      numStr=String(num);
+    }
+    const dispVal=num>0?numStr+unit:'-';
+    DV[distKey]=dispVal;
+    const el=document.getElementById(distKey+'-v');if(el){el.textContent=dispVal;el.className=num>0?'fr-val set':'fr-val';}
     const field=distKey.replace(/^sf-/,'');
     if(num>0){SF[field]=num;SF[field+'_unit']=unit;}
-    if(distKey==='hs-hdist'){holes[curHole].dist=num;const e=document.getElementById('hs-hdist-v');if(e)e.textContent=num>0?num+'y':'-';}
+    if(distKey==='hs-hdist'){holes[curHole].dist=Math.round(num);const e=document.getElementById('hs-hdist-v');if(e)e.textContent=num>0?Math.round(num)+'y':'-';}
   }
   document.getElementById('dist-ov').classList.remove('open');
 }
@@ -2342,6 +2379,78 @@ function openMetricDetail(type){
     <div class="sec-lbl">ホール別データ</div>
     <div class="card" style="padding:0 16px">${rows.join('')||'<div style="padding:16px;text-align:center;color:var(--text-2)">データがありません</div>'}</div>`;
 
+  }else if(type==='putt-detail'){
+    title='パット詳細分析';
+    // プロフィールから一歩cm取得
+    const profD=loadProfile()||{};
+    const strideD=profD.strideLen||75;
+    function ptM(dist,unit){
+      if(!dist||dist<=0)return null;
+      if(unit==='m')return dist;
+      if(unit==='y')return dist*0.9144;
+      if(unit==='歩数')return dist*strideD/100;
+      return dist;
+    }
+    // 第1パットを収集
+    const fps=[];
+    allHoles.forEach(h=>{
+      const ps=h.shots.filter(s=>s.club&&s.club.includes('パター'));
+      if(!ps.length)return;
+      const fp=ps[0];
+      if(!fp.dist)return;
+      const dm=ptM(fp.dist,fp.dist_unit||'歩数');
+      if(dm===null)return;
+      const made=fp.cupIn===true;
+      fps.push({distM:dm,made,ps,h,fp});
+    });
+    // 2m以内
+    const fps2=fps.filter(p=>p.distM<=2);
+    const fps2m=fps2.filter(p=>p.made).length;
+    const r2=fps2.length?Math.round(fps2m/fps2.length*100):null;
+    // 距離別イン率（2〜10m 1m刻み）
+    const longRows=[];
+    for(let d=2;d<=10;d++){
+      const inR=fps.filter(p=>p.distM>=d&&p.distM<d+1);
+      if(inR.length===0)continue;
+      const mk=inR.filter(p=>p.made).length;
+      const rate=Math.round(mk/inR.length*100);
+      const bar=`<div style="width:${rate}%;height:6px;background:var(--blue);border-radius:3px;transition:width 0.4s"></div>`;
+      longRows.push(`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border-lt)">
+        <div style="width:32px;font-size:13px;font-weight:600;flex-shrink:0">${d}m</div>
+        <div style="flex:1;background:var(--bg);border-radius:3px;overflow:hidden">${bar}</div>
+        <div style="font-size:13px;font-weight:700;min-width:36px;text-align:right">${rate}%</div>
+        <div style="font-size:11px;color:var(--text-3)">${mk}/${inR.length}</div>
+      </div>`);
+    }
+    // 2m以上の寄せ率
+    const lps=fps.filter(p=>p.distM>=2&&!p.made);
+    let near=0;
+    lps.forEach(fp=>{
+      const ps=fp.ps;const idx=ps.indexOf(fp.fp);
+      if(idx<0||idx+1>=ps.length)return;
+      const nx=ps[idx+1];if(!nx.dist)return;
+      const nm=ptM(nx.dist,nx.dist_unit||'歩数');
+      if(nm!==null&&nm<=2)near++;
+    });
+    const nr=lps.length?Math.round(near/lps.length*100):null;
+    html=`
+    <div style="background:var(--blue-lt);border-radius:12px;padding:14px 16px;margin-bottom:14px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+        <div><div style="font-size:28px;font-weight:700;color:var(--blue);letter-spacing:-0.04em">${r2!==null?r2+'%':'-'}</div><div style="font-size:11px;color:var(--blue);margin-top:2px">2m以内イン率</div><div style="font-size:10px;color:var(--text-3)">${fps2.length}パット</div></div>
+        <div><div style="font-size:28px;font-weight:700;color:var(--amber);letter-spacing:-0.04em">${nr!==null?nr+'%':'-'}</div><div style="font-size:11px;color:var(--amber);margin-top:2px">2m以内寄せ率</div><div style="font-size:10px;color:var(--text-3)">2m以上の計${lps.length}本</div></div>
+        <div><div style="font-size:28px;font-weight:700;color:var(--text);letter-spacing:-0.04em">${profD.strideLen?profD.strideLen+'cm':'未設定'}</div><div style="font-size:11px;color:var(--text-2);margin-top:2px">一歩の長さ</div><div style="font-size:10px;color:var(--text-3)">歩数→m換算に使用</div></div>
+      </div>
+    </div>
+    ${r2===null&&fps2.length===0?'<div style="padding:16px;text-align:center;color:var(--text-2);font-size:13px">パットの距離データが不足しています。<br>ショット入力時に残距離を入力してください。</div>':''}
+    ${longRows.length?`<div class="sec-lbl">距離別イン率（2m以上）</div>
+    <div class="card" style="padding:8px 16px">${longRows.join('')}</div>`:'<div style="padding:8px 16px;font-size:13px;color:var(--text-2)">距離別データが不足しています（各距離1本以上必要）</div>'}
+    ${nr!==null?`<div class="sec-lbl" style="margin-top:12px">解説</div>
+    <div class="card" style="padding:12px 16px;font-size:13px;color:var(--text-2);line-height:1.6">
+      <b>2m以内イン率</b>：2m以内の第1パットがカップに入った割合。プロは90%以上。<br>
+      <b>2m以内寄せ率</b>：2m以上の長いパットで次打が2m以内に寄れた割合。高いほど2パット率が上がります。<br>
+      <b>歩数設定</b>：プロフィール設定で一歩の距離を設定すると歩数→m換算が正確になります。
+    </div>`:''}`;
+
   }else if(type==='ob'){
     title='OB・ペナルティ';
     const obHoles=allHoles.filter(h=>h.shots.some(s=>s.land&&(s.land.includes('OB')||s.land.includes('ウォーター（1罰打）'))));
@@ -2447,6 +2556,69 @@ function renderAnalysis(){
   const threePuttRate=totalHoles?Math.round(threePuttHoles/totalHoles*100):0;
   const onePuttHoles=allHoles.filter(h=>h.shots.filter(s=>s.club&&s.club.includes('パター')).length===1).length;
   const onePuttRate=totalHoles?Math.round(onePuttHoles/totalHoles*100):0;
+
+  // ─── 詳細パット分析 ───
+  // プロフィールから一歩の距離（cm）を取得
+  const profData=loadProfile()||{};
+  const strideCm=profData.strideLen||75; // デフォルト75cm
+
+  // 距離をmに変換するヘルパー
+  function puttDistToM(dist,unit){
+    if(!dist||dist<=0)return null;
+    if(unit==='m')return dist;
+    if(unit==='y')return dist*0.9144;
+    if(unit==='歩数')return dist*strideCm/100;
+    return dist; // 単位不明はそのまま
+  }
+
+  // パットの第1打（その穴の最初のパット）を収集
+  const firstPutts=[];
+  allHoles.forEach(h=>{
+    const ps=h.shots.filter(s=>s.club&&s.club.includes('パター'));
+    if(!ps.length)return;
+    const fp=ps[0];
+    if(!fp.dist)return;
+    const dm=puttDistToM(fp.dist,fp.dist_unit||'歩数');
+    if(dm===null)return;
+    const holed=fp.cupIn||(ps.length===1&&fp.cupIn!==false&&ps.length===1); // カップインか
+    // cupInフラグで判定
+    const made=fp.cupIn===true;
+    firstPutts.push({distM:dm,made,shot:fp});
+  });
+
+  // 2m以内のイン率
+  const putts2m=firstPutts.filter(p=>p.distM<=2);
+  const putts2mMade=putts2m.filter(p=>p.made).length;
+  const inRate2m=putts2m.length?Math.round(putts2mMade/putts2m.length*100):null;
+
+  // 2m以上：距離別イン率（1m刻み 2〜10m）
+  const longPuttStats={};
+  for(let d=2;d<=10;d++){
+    const inRange=firstPutts.filter(p=>p.distM>=d&&p.distM<d+1);
+    if(inRange.length>0){
+      const made=inRange.filter(p=>p.made).length;
+      longPuttStats[d+'m']={total:inRange.length,made,rate:Math.round(made/inRange.length*100)};
+    }
+  }
+
+  // 2m以上の寄せ率（次の第2パット以降の距離が2m以内か）
+  const longPutts2plus=firstPutts.filter(p=>p.distM>=2);
+  let nearMiss2m=0;
+  longPutts2plus.forEach(fp=>{
+    if(fp.made)return; // 入ったものは除外
+    // 同ホールの次のパット距離をチェック
+    // allHolesからこのショットを含むホールを特定
+    const hole=allHoles.find(h=>h.shots.includes(fp.shot));
+    if(!hole)return;
+    const ps=hole.shots.filter(s=>s.club&&s.club.includes('パター'));
+    const idx=ps.indexOf(fp.shot);
+    if(idx<0||idx+1>=ps.length)return;
+    const next=ps[idx+1];
+    if(!next.dist)return;
+    const nm=puttDistToM(next.dist,next.dist_unit||'歩数');
+    if(nm!==null&&nm<=2)nearMiss2m++;
+  });
+  const nearRate=longPutts2plus.length?Math.round(nearMiss2m/longPutts2plus.length*100):null;
 
   // FIR
   const par4or5Holes=allHoles.filter(h=>h.par>=4);
@@ -2972,6 +3144,12 @@ function renderAnalysis(){
         <div style="text-align:right;margin-left:10px"><div style="font-size:18px;font-weight:700">${avgPutt}</div></div>
         <div style="font-size:11px;color:var(--text-3);margin-left:6px">›</div>
       </div>
+      <div class="tappable-row" onclick="openMetricDetail('putt-detail')">
+        <div class="trend-dot" style="background:var(--blue);margin-right:10px"></div>
+        <div style="flex:1"><div style="font-size:15px;font-weight:600">パット詳細分析</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">2m以内イン率・距離別イン率・寄せ率</div></div>
+        <div style="text-align:right;margin-left:10px"><div style="font-size:18px;font-weight:700">${inRate2m!==null?inRate2m+'%':'-'}</div><div style="font-size:10px;color:var(--text-2)">2m以内</div></div>
+        <div style="font-size:11px;color:var(--text-3);margin-left:6px">›</div>
+      </div>
       <div class="tappable-row" onclick="openMetricDetail('ob')">
         <div class="trend-dot" style="background:var(--red);margin-right:10px"></div>
         <div style="flex:1"><div style="font-size:15px;font-weight:600">OB・ペナルティ</div><div style="font-size:12px;color:var(--text-2);margin-top:2px">1ホールあたりの罰打発生回数（0が理想）</div></div>
@@ -3359,6 +3537,8 @@ function renderProfilePage(){
         <input class="profile-input" id="p-hcp" value="${p.handicap||''}" placeholder="例：18" inputmode="decimal" type="number" step="0.1"></div>
       <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">目標スコア（18H）</label>
         <input class="profile-input" id="p-goal-score" value="${p.goalScore||''}" placeholder="例：90" inputmode="numeric" type="number"></div>
+      <div><label style="font-size:12px;color:var(--text-2);display:block;margin-bottom:4px">一歩の距離（cm）<span style="font-size:11px;font-weight:400"> ―パット分析用（つま先〜つま先）</span></label>
+        <input class="profile-input" id="p-stride" value="${p.strideLen||''}" placeholder="例：75" inputmode="numeric" type="number"></div>
     </div>
 
     <div class="sec-lbl">スウィング情報</div>
@@ -3534,6 +3714,7 @@ function saveProfile(){
   p.name=document.getElementById('p-name')?.value||p.name||'';
   p.handicap=document.getElementById('p-hcp')?.value||p.handicap||'';
   p.goalScore=document.getElementById('p-goal-score')?.value||p.goalScore||'';
+  p.strideLen=parseInt(document.getElementById('p-stride')?.value)||null;
   p.hand=tmp.hand||p.hand||'right';
   p.ballFlight=tmp.ballFlight||p.ballFlight||'';
   p.golfHistory=tmp.golfHistory||p.golfHistory||'';
