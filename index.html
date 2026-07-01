@@ -2288,6 +2288,87 @@ function showSummary(){
 // ===== ANALYSIS =====
 function openAnalysis(){goTo('s8');renderAnalysis();}
 
+// パット距離帯ごとのデータ一覧モーダル
+function openPuttBandDetail(bandIdx){
+  const bands=window._puttBands||[];
+  const fps=window._puttFps||[];
+  const ptM=window._puttPtM;
+
+  let title,targets;
+  if(bandIdx===-1){
+    // 2m以内イン率の詳細
+    title='2m以内のパット一覧';
+    targets=fps.filter(p=>p.distM<2);
+  }else{
+    const b=bands[bandIdx];
+    if(!b)return;
+    title=b.label+'のパット一覧';
+    targets=fps.filter(p=>p.distM>=b.lo&&(b.hi===null?true:p.distM<b.hi));
+  }
+
+  if(!targets.length){showToastMsg('データがありません');return;}
+
+  const rows=targets.map((p,i)=>{
+    const madeChip=p.made
+      ?`<span style="background:var(--green-lt);color:var(--green-dk);font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px">⛳ イン</span>`
+      :`<span style="background:var(--bg);color:var(--text-3);font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;border:0.5px solid var(--border)">ミス</span>`;
+    const distStr=p.distOrig;
+    const distMStr=p.distM.toFixed(1)+'m';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:0.5px solid var(--border-lt)">
+      <div style="flex-shrink:0;text-align:center;width:28px">
+        <div style="font-size:11px;color:var(--text-3)">${p.dispNum}番</div>
+        <div style="font-size:10px;color:var(--text-3)">Par${p.par}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${p.roundCourse}</div>
+        <div style="font-size:11px;color:var(--text-3)">${p.roundDate} · 残${distStr}（≈${distMStr}）</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        ${madeChip}
+        <button onclick="editPuttFromDetail(${i})" style="background:none;border:none;color:var(--green);font-size:12px;cursor:pointer;padding:4px 6px;border-radius:6px;border:0.5px solid var(--green)">編集</button>
+      </div>
+    </div>`;
+  });
+
+  const made=targets.filter(p=>p.made).length;
+  const rate=Math.round(made/targets.length*100);
+
+  // s9パネルにオーバーレイで表示
+  const el=document.getElementById('s9-content');
+  const overlay=document.createElement('div');
+  overlay.id='putt-band-overlay';
+  overlay.style.cssText='position:fixed;inset:0;background:var(--card);z-index:500;overflow-y:auto;padding:0 0 40px';
+  overlay.innerHTML=`
+    <div style="position:sticky;top:0;background:rgba(247,247,245,0.95);backdrop-filter:blur(12px);padding:12px 16px;border-bottom:0.5px solid var(--border);display:flex;align-items:center;gap:12px;z-index:1">
+      <button onclick="document.getElementById('putt-band-overlay')?.remove()" style="background:none;border:none;color:var(--green);font-size:14px;font-weight:600;cursor:pointer;padding:4px">← 戻る</button>
+      <div style="flex:1;font-size:16px;font-weight:700;text-align:center">${title}</div>
+      <div style="min-width:44px;text-align:right;font-size:13px;font-weight:700;color:${rate>=70?'var(--green)':'var(--amber)'}">${rate}%</div>
+    </div>
+    <div style="padding:12px 16px 6px;display:flex;gap:16px">
+      <div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--text)">${targets.length}</div><div style="font-size:11px;color:var(--text-2)">合計</div></div>
+      <div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--green)">${made}</div><div style="font-size:11px;color:var(--green)">イン</div></div>
+      <div style="text-align:center"><div style="font-size:24px;font-weight:700;color:var(--text-2)">${targets.length-made}</div><div style="font-size:11px;color:var(--text-2)">ミス</div></div>
+    </div>
+    <div style="padding:0 16px">${rows.join('')}</div>
+  `;
+  // 編集ボタン用に対象データを保存
+  overlay._targets=targets;
+  document.body.appendChild(overlay);
+}
+
+function editPuttFromDetail(idx){
+  const overlay=document.getElementById('putt-band-overlay');
+  if(!overlay||!overlay._targets)return;
+  const target=overlay._targets[idx];
+  if(!target)return;
+  // ラウンド履歴から該当ホールを探してショット編集へ
+  const rounds=loadRounds();
+  const r=rounds.find(r=>r.date===target.roundDate&&r.course===target.roundCourse);
+  if(!r){showToastMsg('ラウンドデータが見つかりません');return;}
+  overlay.remove();
+  openHistoryDetail(r.id,target.dispNum-1);
+}
+
 function openMetricDetail(type){
   const rounds=loadRounds();
   const allHoles=[];
@@ -2381,9 +2462,10 @@ function openMetricDetail(type){
 
   }else if(type==='putt-detail'){
     title='パット詳細分析';
-    // プロフィールから一歩cm取得
     const profD=loadProfile()||{};
+    // 歩数未設定時は75cm（成人男性平均）をデフォルトに
     const strideD=profD.strideLen||75;
+    const strideLabel=profD.strideLen?profD.strideLen+'cm':'75cm（平均値）';
     function ptM(dist,unit){
       if(!dist||dist<=0)return null;
       if(unit==='m')return dist;
@@ -2391,7 +2473,7 @@ function openMetricDetail(type){
       if(unit==='歩数')return dist*strideD/100;
       return dist;
     }
-    // 第1パットを収集
+    // 第1パットを収集（ホール・ラウンド情報付き）
     const fps=[];
     allHoles.forEach(h=>{
       const ps=h.shots.filter(s=>s.club&&s.club.includes('パター'));
@@ -2401,28 +2483,63 @@ function openMetricDetail(type){
       const dm=ptM(fp.dist,fp.dist_unit||'歩数');
       if(dm===null)return;
       const made=fp.cupIn===true;
-      fps.push({distM:dm,made,ps,h,fp});
+      fps.push({distM:dm,made,ps,h,fp,
+        distOrig:fp.dist+(fp.dist_unit||'歩数'),
+        dispNum:h.dispNum,
+        roundDate:h.roundDate,
+        roundCourse:h.roundCourse,
+        par:h.par,
+        holeObj:h,
+        shotObj:fp
+      });
     });
-    // 2m以内
-    const fps2=fps.filter(p=>p.distM<=2);
-    const fps2m=fps2.filter(p=>p.made).length;
-    const r2=fps2.length?Math.round(fps2m/fps2.length*100):null;
-    // 距離別イン率（2〜10m 1m刻み）
-    const longRows=[];
-    for(let d=2;d<=10;d++){
-      const inR=fps.filter(p=>p.distM>=d&&p.distM<d+1);
-      if(inR.length===0)continue;
+
+    // ── 2m以内イン率（1m以下 + 1〜2m帯 の合計）──
+    const fps_u2=fps.filter(p=>p.distM<2);   // 0〜2m未満
+    const fps_2=fps.filter(p=>p.distM>=2&&p.distM<3); // 2〜3m帯
+    // 「2m以内」= 0〜2m未満の帯（1m以下 + 1〜2m）
+    const fps2all=fps.filter(p=>p.distM<2);
+    const fps2made=fps2all.filter(p=>p.made).length;
+    const r2=fps2all.length?Math.round(fps2made/fps2all.length*100):null;
+
+    // ── 距離別（1m以下、1〜2m、2〜3m ... 10m以上）──
+    function getRange(lo,hi){return fps.filter(p=>p.distM>=lo&&(hi===null?true:p.distM<hi));}
+    const bands=[
+      {label:'〜1m', lo:0,   hi:1},
+      {label:'1〜2m',lo:1,   hi:2},
+      {label:'2〜3m',lo:2,   hi:3},
+      {label:'3〜4m',lo:3,   hi:4},
+      {label:'4〜5m',lo:4,   hi:5},
+      {label:'5〜6m',lo:5,   hi:6},
+      {label:'6〜7m',lo:6,   hi:7},
+      {label:'7〜8m',lo:7,   hi:8},
+      {label:'8〜9m',lo:8,   hi:9},
+      {label:'9〜10m',lo:9,  hi:10},
+      {label:'10m以上',lo:10,hi:null},
+    ];
+
+    // データ一覧モーダルを開く関数（グローバル）
+    window._puttBands=bands;
+    window._puttFps=fps;
+    window._puttPtM=ptM;
+
+    const distRows=bands.map((b,bi)=>{
+      const inR=getRange(b.lo,b.hi);
+      if(inR.length===0)return'';
       const mk=inR.filter(p=>p.made).length;
       const rate=Math.round(mk/inR.length*100);
-      const bar=`<div style="width:${rate}%;height:6px;background:var(--blue);border-radius:3px;transition:width 0.4s"></div>`;
-      longRows.push(`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border-lt)">
-        <div style="width:32px;font-size:13px;font-weight:600;flex-shrink:0">${d}m</div>
-        <div style="flex:1;background:var(--bg);border-radius:3px;overflow:hidden">${bar}</div>
-        <div style="font-size:13px;font-weight:700;min-width:36px;text-align:right">${rate}%</div>
-        <div style="font-size:11px;color:var(--text-3)">${mk}/${inR.length}</div>
-      </div>`);
-    }
-    // 2m以上の寄せ率
+      const barColor=b.lo<2?'var(--green)':'var(--blue)';
+      const bar=`<div style="width:${rate}%;height:6px;background:${barColor};border-radius:3px"></div>`;
+      return`<div onclick="openPuttBandDetail(${bi})" style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:0.5px solid var(--border-lt);cursor:pointer;-webkit-tap-highlight-color:transparent" ontouchstart="this.style.background='var(--bg)'" ontouchend="this.style.background=''">
+        <div style="width:48px;font-size:13px;font-weight:600;flex-shrink:0;color:${b.lo<2?'var(--green)':'var(--text)'}">${b.label}</div>
+        <div style="flex:1;background:var(--border-lt);border-radius:3px;overflow:hidden">${bar}</div>
+        <div style="font-size:13px;font-weight:700;min-width:38px;text-align:right">${rate}%</div>
+        <div style="font-size:11px;color:var(--text-3);min-width:30px;text-align:right">${mk}/${inR.length}</div>
+        <div style="font-size:11px;color:var(--text-3)">›</div>
+      </div>`;
+    }).filter(Boolean);
+
+    // ── 2m以上の寄せ率 ──
     const lps=fps.filter(p=>p.distM>=2&&!p.made);
     let near=0;
     lps.forEach(fp=>{
@@ -2430,26 +2547,39 @@ function openMetricDetail(type){
       if(idx<0||idx+1>=ps.length)return;
       const nx=ps[idx+1];if(!nx.dist)return;
       const nm=ptM(nx.dist,nx.dist_unit||'歩数');
-      if(nm!==null&&nm<=2)near++;
+      if(nm!==null&&nm<2)near++;
     });
     const nr=lps.length?Math.round(near/lps.length*100):null;
+
     html=`
     <div style="background:var(--blue-lt);border-radius:12px;padding:14px 16px;margin-bottom:14px">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
-        <div><div style="font-size:28px;font-weight:700;color:var(--blue);letter-spacing:-0.04em">${r2!==null?r2+'%':'-'}</div><div style="font-size:11px;color:var(--blue);margin-top:2px">2m以内イン率</div><div style="font-size:10px;color:var(--text-3)">${fps2.length}パット</div></div>
-        <div><div style="font-size:28px;font-weight:700;color:var(--amber);letter-spacing:-0.04em">${nr!==null?nr+'%':'-'}</div><div style="font-size:11px;color:var(--amber);margin-top:2px">2m以内寄せ率</div><div style="font-size:10px;color:var(--text-3)">2m以上の計${lps.length}本</div></div>
-        <div><div style="font-size:28px;font-weight:700;color:var(--text);letter-spacing:-0.04em">${profD.strideLen?profD.strideLen+'cm':'未設定'}</div><div style="font-size:11px;color:var(--text-2);margin-top:2px">一歩の長さ</div><div style="font-size:10px;color:var(--text-3)">歩数→m換算に使用</div></div>
+        <div onclick="openPuttBandDetail(-1)" style="cursor:pointer">
+          <div style="font-size:28px;font-weight:700;color:var(--green);letter-spacing:-0.04em">${r2!==null?r2+'%':'-'}</div>
+          <div style="font-size:11px;color:var(--green-dk);margin-top:2px">2m以内イン率</div>
+          <div style="font-size:10px;color:var(--text-3)">${fps2all.length}本 ›</div>
+        </div>
+        <div>
+          <div style="font-size:28px;font-weight:700;color:var(--amber);letter-spacing:-0.04em">${nr!==null?nr+'%':'-'}</div>
+          <div style="font-size:11px;color:var(--amber);margin-top:2px">2m以内寄せ率</div>
+          <div style="font-size:10px;color:var(--text-3)">2m以上の計${lps.length}本</div>
+        </div>
+        <div>
+          <div style="font-size:22px;font-weight:700;color:var(--text);letter-spacing:-0.04em">${strideLabel}</div>
+          <div style="font-size:11px;color:var(--text-2);margin-top:2px">一歩の長さ</div>
+          <div style="font-size:10px;color:var(--text-3)">${profD.strideLen?'設定済み':'デフォルト'}</div>
+        </div>
       </div>
     </div>
-    ${r2===null&&fps2.length===0?'<div style="padding:16px;text-align:center;color:var(--text-2);font-size:13px">パットの距離データが不足しています。<br>ショット入力時に残距離を入力してください。</div>':''}
-    ${longRows.length?`<div class="sec-lbl">距離別イン率（2m以上）</div>
-    <div class="card" style="padding:8px 16px">${longRows.join('')}</div>`:'<div style="padding:8px 16px;font-size:13px;color:var(--text-2)">距離別データが不足しています（各距離1本以上必要）</div>'}
-    ${nr!==null?`<div class="sec-lbl" style="margin-top:12px">解説</div>
+    ${fps.length===0?'<div style="padding:16px;text-align:center;color:var(--text-2);font-size:13px">パットの距離データがありません。<br>ショット入力時に残距離を入力してください。</div>':''}
+    ${distRows.length?`<div class="sec-lbl">距離別イン率（タップでデータ一覧）</div>
+    <div class="card" style="padding:4px 16px">${distRows.join('')}</div>`:''}
+    <div class="sec-lbl" style="margin-top:12px">解説</div>
     <div class="card" style="padding:12px 16px;font-size:13px;color:var(--text-2);line-height:1.6">
-      <b>2m以内イン率</b>：2m以内の第1パットがカップに入った割合。プロは90%以上。<br>
-      <b>2m以内寄せ率</b>：2m以上の長いパットで次打が2m以内に寄れた割合。高いほど2パット率が上がります。<br>
-      <b>歩数設定</b>：プロフィール設定で一歩の距離を設定すると歩数→m換算が正確になります。
-    </div>`:''}`;
+      <b>2m以内イン率</b>：〜1m + 1〜2m帯の合計。カップから2m未満の第1パットが入った割合。<br>
+      <b>2m以内寄せ率</b>：2m以上の長いパットで次打が2m未満に寄れた割合。<br>
+      <b>歩数→m換算</b>：プロフィールで一歩の距離を設定するとより正確に。未設定時は75cm（成人男性平均）を使用。
+    </div>`;
 
   }else if(type==='ob'){
     title='OB・ペナルティ';
@@ -2586,28 +2716,19 @@ function renderAnalysis(){
     firstPutts.push({distM:dm,made,shot:fp});
   });
 
-  // 2m以内のイン率
-  const putts2m=firstPutts.filter(p=>p.distM<=2);
+  // 2m以内のイン率（0〜2m未満の帯：〜1m + 1〜2m）
+  const putts2m=firstPutts.filter(p=>p.distM<2);
   const putts2mMade=putts2m.filter(p=>p.made).length;
   const inRate2m=putts2m.length?Math.round(putts2mMade/putts2m.length*100):null;
 
-  // 2m以上：距離別イン率（1m刻み 2〜10m）
+  // 距離別イン率（〜1m、1〜2m、2〜3m ... 10m以上）
   const longPuttStats={};
-  for(let d=2;d<=10;d++){
-    const inRange=firstPutts.filter(p=>p.distM>=d&&p.distM<d+1);
-    if(inRange.length>0){
-      const made=inRange.filter(p=>p.made).length;
-      longPuttStats[d+'m']={total:inRange.length,made,rate:Math.round(made/inRange.length*100)};
-    }
-  }
 
-  // 2m以上の寄せ率（次の第2パット以降の距離が2m以内か）
+  // 2m以上の寄せ率（次打が2m未満に寄れた割合）
   const longPutts2plus=firstPutts.filter(p=>p.distM>=2);
   let nearMiss2m=0;
   longPutts2plus.forEach(fp=>{
-    if(fp.made)return; // 入ったものは除外
-    // 同ホールの次のパット距離をチェック
-    // allHolesからこのショットを含むホールを特定
+    if(fp.made)return;
     const hole=allHoles.find(h=>h.shots.includes(fp.shot));
     if(!hole)return;
     const ps=hole.shots.filter(s=>s.club&&s.club.includes('パター'));
@@ -2616,7 +2737,7 @@ function renderAnalysis(){
     const next=ps[idx+1];
     if(!next.dist)return;
     const nm=puttDistToM(next.dist,next.dist_unit||'歩数');
-    if(nm!==null&&nm<=2)nearMiss2m++;
+    if(nm!==null&&nm<2)nearMiss2m++;
   });
   const nearRate=longPutts2plus.length?Math.round(nearMiss2m/longPutts2plus.length*100):null;
 
